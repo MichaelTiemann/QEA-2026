@@ -1,14 +1,7 @@
 %% QEA-2026: Unemployment, Medical, and Energy Shocks
 
-%% Life-Cycle Model 21: Idiosyncratic medical shocks in retirement
-% In Life-Cycle Model 20 we saw how to make exogenous markov z have
-% different transition probabilities at each age/period. We can also make
-% the grid values differ by age (as long as number of grid points does not
-% change). Because we only were using z as labor productivity during
-% working ages, and then just ignoring z in retirement, we can just
-% repurpose z during retirement to use it to model something else.
-% That is what we do here, we use z as labor productivity during working
-% ages, and as medical shocks in retirement. ExogShockFn is used to make
+%% Adapted from Life-Cycle Model 21: Idiosyncratic medical shocks in retirement
+% Various ExogShockFn are used to make
 % both the grid and transition probabilities depend on age.
 
 % Note: Both the z1_grid_J and the ExogShockFn approaches require that the
@@ -18,7 +11,9 @@
 %
 % One decision variable: h, labour hours worked
 % One endogenous state variable: a, assets (total household savings)
-% One stochastic exogenous state variable: z, dual-purpose ('unemployment' shock in working age, medical shock in retirement)
+% Two stochastic exogenous state variables:
+%     z1, dual-purpose ('unemployment' shock in working age, medical shock in retirement)
+%     z2, AR(1) energy price shock
 % Age: j
 
 %% Begin setting up to use VFI Toolkit to solve
@@ -28,9 +23,9 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=51; % Endogenous labour choice (fraction of time worked)
-n_a=201; % Endogenous asset holdings
-n_z=[2,11]; % Exogenous labor productivity units shock
+n_d=[21,17]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_a=[91,11,11]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_z=[2,9]; % Exogenous labor productivity units shock
 N_j=Params.J; % Number of periods in finite horizon
 
 %% Parameters
@@ -77,19 +72,44 @@ Params.wg3=Params.sigma; % By using the same curvature as the utility of consump
 
 
 %% Grids
-vfoptions.precision='double';
-% The ^3 means that there are more points near 0 and near 10. We know from theory that the value function will be more 'curved' near zero assets,
+vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
+cast2precision=str2func(vfoptions.precision);
+vfoptions.lowmemory=3;
+
+% The ^3 means that there are more points near 0 and near 16. We know from theory that the value function will be more 'curved' near zero assets,
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
-a_grid=10*(linspace(0,1,n_a).^3)'; % The ^3 means most points are near zero, which is where the derivative of the value fn changes most.
+zero=cast2precision(0);
+a_grid_cubed=linspace(zero,1,floor(n_a(1)/4)+1).^3;
+a_grid_linear=linspace(cast2precision(1),16,ceil(3*n_a(1)/4));
+asset_grid=[a_grid_cubed, a_grid_linear(2:end)]';
+
+pv_grid=linspace(zero,10,n_a(2))';
+
+ks_grid=linspace(zero,10,n_a(3))';
+
+a_grid=[asset_grid; pv_grid; ks_grid];
 
 % Grid for labour choice
-h_grid=linspace(0,1,n_d)'; % Notice that it is imposing the 0<=h<=1 condition implicitly
+h_grid=linspace(zero,1,n_d(1))'; % Notice that it is imposing the 0<=h<=1 condition implicitly
+% Grid for kiwisaver liquidation
+ks_out_grid=(linspace(zero,1,n_d(2)).^3)';
+
 % Switch into toolkit notation
-d_grid=h_grid;
+d_grid=[h_grid; ks_out_grid];
+
+% tell the code how many d1, d2, and d3 there are
+% Idea is to distinguish three categories of decision variable:
+%  d1: decision is in the ReturnFn but not in aprimeFn
+%  d2: decision is in the aprimeFn but not in ReturnFn
+%  d3: decision is in both ReturnFn and in aprimeFn
+% Note: ReturnFn must use inputs (d1,d3,..) 
+%       aprimeFn must use inputs (d2,d3,..)
+% n_d must be set up as n_d=[n_d1, n_d2, n_d3]
+% d_grid must be set up as d_grid=[d1_grid; d2_grid; d3_grid];
 
 %% z1_grid and pi_z1 as a function that depends on age
 % Note that the dependence on age is just via the parameters that are input
-% In this example, agej obviously depends on age
+% In this example, agej obviously depends on age (it is a vector)
 vfoptions.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn(agej,Jr);
 % simoptions.ExogShockFn=vfoptions.ExogShockFn;
 
@@ -103,29 +123,29 @@ z2_grid=exp(z2_grid); % Take exponential of the grid
 [mean_z2,~,~,~]=MarkovChainMoments(z2_grid,pi_z2); % Calculate the mean of the grid so as can normalise it
 z2_grid=z2_grid./mean_z2; % Normalise the grid on z2 (so that the mean of z2 is exactly 1)
 
-% Use divide-and-conquer and grid interpolation layer (see Life-Cycle Models 29 and 30)
-if false
-vfoptions.divideandconquer=1; % turn on divide-and-conquer
-vfoptions.level1n=9;
-vfoptions.gridinterplayer=1; % turn on grid interpolation layer
-vfoptions.ngridinterp=20; % 20 evenly-spaced points between each pair of consecutive a_grid points
-simoptions.gridinterplayer=vfoptions.gridinterplayer; % grid interpolation layer must also be set in simoptions (because it changes Policy size/interpretation)
-simoptions.ngridinterp=vfoptions.ngridinterp;
-else
-    simoptions=struct();
-end
 % Both value function and simulations need to know about the age-dependence exogenous shocks
 
 [z_gridvals_J,pi_z_J,statdist_z1,vfoptions]=Setup_QEA(n_z,z2_grid,pi_z2,Params,vfoptions.ExogShockFn1,vfoptions);
 
+
+%% Define aprime function for KiwiSaver
+Params.ks_r=0.08; % Long-term growth estimate
+Params.ks_employee=0.05; % Employee contribution
+Params.ks_employer=0.05; % Employer contribution
+ks_primeFn=@(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+vfoptions.aprimeFn=ks_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
+vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
+simoptions.d_grid=d_grid;
+simoptions.a_grid=a_grid;
+simoptions.z_grid=z_gridvals_J;
 
 %% Now, create the return function
 Params.energy_shock=0;
 DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
-ReturnFn=@(h,aprime,a,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock) ...
-    QEA_ReturnFn(h,aprime,a,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock);
+ReturnFn=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock) ...
+    QEA_ReturnFn(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock);
 
 %% Solve the value function iteration problem
 disp('Solve for Value fn and Policy fn using ValueFnIter command')
@@ -138,8 +158,8 @@ toc
 
 %% Initial distribution of agents at birth (j=1)
 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist=zeros([n_a,n_z],'gpuArray'); % Put no households anywhere on grid
-jequaloneDist(1,:,(n_z(2)+1)/2)=statdist_z1; % All agents start with zero assets, with z drawn from its stationary distribution
+jequaloneDist=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist(1,1,1,:,(n_z(2)+1)/2)=statdist_z1; % All agents start with zero assets, no pvs, no kiwisaver, with z drawn from its stationary distribution
 
 %% We now compute the 'stationary distribution' of households
 % Start with a mass of one at initial age, use the conditional survival
@@ -156,11 +176,13 @@ StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Pol
 
 %% FnsToEvaluate are how we say what we want to graph the life-cycles of
 % Like with return function, we have to include (h,aprime,a,z) as first inputs, then just any relevant parameters.
-FnsToEvaluate.fractiontimeworked=@(h,aprime,a,z1,z2) h; % h is fraction of time worked
-FnsToEvaluate.earnings=@(h,aprime,a,z1,z2,w,kappa_j) w*kappa_j*z1*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
-FnsToEvaluate.assets=@(h,aprime,a,z1,z2) a; % a is the current asset holdings
-FnsToEvaluate.fractionunemployed=@(h,aprime,a,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
-FnsToEvaluate.fractionwithmedicalexpenses=@(h,aprime,a,z1,z2) (z1==0.3); % indicator for z=0.3 medical shock
+FnsToEvaluate.fractiontimeworked=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) h; % h is fraction of time worked
+FnsToEvaluate.earnings=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,kappa_j) w*kappa_j*z1*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
+FnsToEvaluate.assets=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) a; % a is the current asset holdings
+FnsToEvaluate.pv=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) pv; % a is the current asset holdings
+FnsToEvaluate.ks_balance=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) ks_balance; % a is the current asset holdings
+FnsToEvaluate.fractionunemployed=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
+FnsToEvaluate.fractionwithmedicalexpenses=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2) (z1==0.3); % indicator for z=0.3 medical shock
 
 %% Calculate the life-cycle profiles
 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions);
@@ -173,19 +195,30 @@ AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEva
 % those were trivial, but now that we have an idiosyncratic shock z they
 % are meaningful and worth looking at.
 
+figure(2)
+plot(1:1:Params.J,AgeConditionalStats.assets.Mean)
+title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho_z2 = %.3f;\nParams.sigma_epsilon_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
+legend('Unemployment+Medical Expense Shocks')
+
+
 %% Plot the life cycle profiles of fraction-of-time-worked, earnings, assets, unemployment, and medical expenses
 figure(1)
-subplot(5,1,1); plot(1:1:Params.J,AgeConditionalStats.fractiontimeworked.Mean)
+subplot(4,2,1); plot(1:1:Params.J,AgeConditionalStats.fractiontimeworked.Mean)
 title('Life Cycle Profile: Fraction Time Worked (h)')
-subplot(5,1,2); plot(1:1:Params.J,AgeConditionalStats.earnings.Mean)
+subplot(4,2,3); plot(1:1:Params.J,AgeConditionalStats.earnings.Mean)
 title('Life Cycle Profile: Labor Earnings (w kappa_j z h)')
-subplot(5,1,3); plot(1:1:Params.J,AgeConditionalStats.assets.Mean)
-title('Life Cycle Profile: Assets (a)')
-subplot(5,1,4); plot(1:1:Params.J,[AgeConditionalStats.fractionunemployed.Mean(1:Params.Jr-1),nan(1,Params.J-Params.Jr+1)])
+subplot(4,2,5); plot(1:1:Params.J,[AgeConditionalStats.fractionunemployed.Mean(1:Params.Jr-1),zeros(1,Params.J-Params.Jr+1)])
 title('Life Cycle Profile: Fraction Unemployment (z==0)')
-xlim([1,Params.J])
-subplot(5,1,5); plot(1:1:Params.J,AgeConditionalStats.fractionwithmedicalexpenses.Mean)
+subplot(4,2,7); plot(1:1:Params.J,AgeConditionalStats.fractionwithmedicalexpenses.Mean)
 title('Life Cycle Profile: Fraction experiencing medical expenses (z==0.3)')
+subplot(4,2,2); plot(1:1:Params.J,AgeConditionalStats.assets.Mean)
+title('Life Cycle Profile: Assets (a)')
+subplot(4,2,4); plot(1:1:Params.J,AgeConditionalStats.pv.Mean)
+title('Life Cycle Profile: 1kW PV Shares + 2KWh Battery (pv)')
+subplot(4,2,6); plot(1:1:Params.J,AgeConditionalStats.ks_balance.Mean)
+title('Life Cycle Profile: KiwiSaver (kw\_balance)')
+xlim([1,Params.J])
+
 
 % Notice how we only plot the first part of
 % AgeConditionalStats.fractionunemployed.Mean(1:Params.Jr-1), because this
@@ -207,8 +240,8 @@ vfoptions_no_medical.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn1(agej,
 
 %% Initial distribution of agents at birth (j=1)
 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist_no_medical=zeros([n_a,n_z],'gpuArray'); % Put no households anywhere on grid
-jequaloneDist_no_medical(1,:,floor((n_z(2)+1)/2))=statdist_z1_no_medical; % All agents start with zero assets, with z drawn from its stationary distribution
+jequaloneDist_no_medical=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist_no_medical(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_medical; % All agents start with zero assets, with z drawn from its stationary distribution
 
 StationaryDist_no_medical=StationaryDist_FHorz_Case1(jequaloneDist_no_medical,AgeWeightsParamNames,Policy_no_medical,n_d,n_a,n_z,N_j,pi_z_no_medical_J,Params,simoptions_no_medical);
 AgeConditionalStats_no_medical=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_medical,Policy_no_medical,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_medical_J,simoptions_no_medical);
@@ -225,8 +258,8 @@ vfoptions_no_unemployment.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn2(
 
 %% Initial distribution of agents at birth (j=1)
 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist_no_unemployment=zeros([n_a,n_z],'gpuArray'); % Put no households anywhere on grid
-jequaloneDist_no_unemployment(1,:,floor((n_z(2)+1)/2))=statdist_z1_no_unemployment; % All agents start with zero assets, with z drawn from its stationary distribution
+jequaloneDist_no_unemployment=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist_no_unemployment(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_unemployment; % All agents start with zero assets, with z drawn from its stationary distribution
 
 StationaryDist_no_unemployment=StationaryDist_FHorz_Case1(jequaloneDist_no_unemployment,AgeWeightsParamNames,Policy_no_unemployment,n_d,n_a,n_z,N_j,pi_z_no_unemployment_J,Params,simoptions_no_unemployment);
 AgeConditionalStats_no_unemployment=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_unemployment,Policy_no_unemployment,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_unemployment_J,simoptions_no_unemployment);
@@ -244,8 +277,8 @@ vfoptions_no_shocks.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn3(agej,J
 
 %% Initial distribution of agents at birth (j=1)
 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist_no_shocks=zeros([n_a,n_z],'gpuArray'); % Put no households anywhere on grid
-jequaloneDist_no_shocks(1,:,floor((n_z(2)+1)/2))=statdist_z1_no_shocks; % All agents start with zero assets, with z drawn from its stationary distribution
+jequaloneDist_no_shocks=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist_no_shocks(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_shocks; % All agents start with zero assets, with z drawn from its stationary distribution
 
 StationaryDist_no_shocks=StationaryDist_FHorz_Case1(jequaloneDist_no_shocks,AgeWeightsParamNames,Policy_no_shocks,n_d,n_a,n_z,N_j,pi_z_no_shocks_J,Params,simoptions_no_shocks);
 AgeConditionalStats_no_shocks=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_shocks,Policy_no_shocks,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_shocks_J,simoptions_no_shocks);
@@ -261,18 +294,58 @@ AgeConditionalStats_energy_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_ene
 
 %% Plot the results
 figure(2)
-five_lines=plot(1:1:Params.J,AgeConditionalStats.assets.Mean, ...
+plot(1:1:Params.J,AgeConditionalStats.assets.Mean, ...
     1:1:Params.J,AgeConditionalStats_no_medical.assets.Mean, ...
     1:1:Params.J,AgeConditionalStats_no_unemployment.assets.Mean, ...
     1:1:Params.J,AgeConditionalStats_no_shocks.assets.Mean, ...
     1:1:Params.J,AgeConditionalStats_energy_only.assets.Mean ...
     );
 title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho_z2 = %.3f;\nParams.sigma_epsilon_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
-legend(five_lines,'Unemployment+Medical Expense Shocks', ...
+legend('Unemployment+Medical Expense Shocks', ...
     'Unemployment but No Medical Shocks', ...
     'Medical but No Unemployment Shocks', ...
     'No Shocks (none at all)', ...
     'Energy Only Shocks', ...
+    'Location','northeast');
+
+figure(3)
+area(1:1:Params.J, [AgeConditionalStats.ks_balance.Mean; AgeConditionalStats.pv.Mean; AgeConditionalStats.assets.Mean]);
+title("Life Cycle Profile: Assets Allocations All Shocks")
+legend('KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast');
+
+figure(4)
+area(1:1:Params.J, [AgeConditionalStats_no_medical.ks_balance.Mean; AgeConditionalStats_no_medical.pv.Mean; AgeConditionalStats_no_medical.assets.Mean]);
+title("Life Cycle Profile: Assets Allocations No Medical Shocks")
+legend('KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast');
+
+figure(5)
+area(1:1:Params.J, [AgeConditionalStats_no_unemployment.ks_balance.Mean; AgeConditionalStats_no_unemployment.pv.Mean; AgeConditionalStats_no_unemployment.assets.Mean]);
+title("Life Cycle Profile: Assets Allocations No Unemployment Shocks")
+legend('KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast');
+
+figure(6)
+area(1:1:Params.J, [AgeConditionalStats_no_shocks.ks_balance.Mean; AgeConditionalStats_no_shocks.pv.Mean; AgeConditionalStats_no_shocks.assets.Mean]);
+title("Life Cycle Profile: Assets Allocations No Shocks (At All)")
+legend('KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast');
+
+figure(7)
+area(1:1:Params.J, [AgeConditionalStats_energy_only.ks_balance.Mean; AgeConditionalStats_energy_only.pv.Mean; AgeConditionalStats_energy_only.assets.Mean]);
+title("Life Cycle Profile: Assets Allocations Energy Only Shocks")
+legend('KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
     'Location','northeast');
 
 % Notice that medical expense shocks late in life cause elderly households
