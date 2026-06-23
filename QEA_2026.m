@@ -23,9 +23,9 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=[21,17]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
-n_a=[91,11,11]; % Endogenous asset holdings: assets, pv, kiwisaver
-n_z=[2,9]; % Exogenous labor productivity units shock
+n_d=[21,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_a=[51,21,11]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_z=[2,9]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 
 %% Parameters
@@ -40,6 +40,17 @@ Params.psi = 10; % Weight on leisure
 % Prices
 Params.w=1; % Wage
 Params.r=0.05; % Interest rate (0.05 is 5%)
+Params.energy_budget=0.3; % Fraction of budget affected by energy costs
+% Note that this include direct costs (utilities, transport fuel) as well as indirect (energy fraction costs of goods and services consumed)
+Params.energy_shock=0; % If 1, shock returns to mean; if > 1, shock increases price by (energy_shock-1)
+% Median Kiwi income is roughly $120K/hh, so $20K 5kW system with 10kWh battery is 1/6th income.
+% One fifth share of that (1kW+2kWh) is 1/30th income.
+Params.pv_share_price=1/30;
+
+% KiwiSaver Scheme
+Params.ks_r=0.07; % Long-term growth estimate
+Params.ks_employee=0.05; % Employee contribution
+Params.ks_employer=0.05; % Employer contribution
 
 % Demographics
 Params.agej=1:1:Params.J; % Is a vector of all the agej: 1,2,3,...,J
@@ -80,12 +91,12 @@ vfoptions.lowmemory=3;
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
 a_grid_cubed=linspace(zero,1,floor(n_a(1)/4)+1).^3;
-a_grid_linear=linspace(cast2precision(1),16,ceil(3*n_a(1)/4));
+a_grid_linear=linspace(cast2precision(1),20,ceil(3*n_a(1)/4));
 asset_grid=[a_grid_cubed, a_grid_linear(2:end)]';
 
-pv_grid=linspace(zero,10,n_a(2))';
+pv_grid=[linspace(zero,9,floor(n_a(2)/2)),linspace(10,30,floor(n_a(2)/2)+1)]';
 
-ks_grid=linspace(zero,10,n_a(3))';
+ks_grid=linspace(zero,40,n_a(3))';
 
 a_grid=[asset_grid; pv_grid; ks_grid];
 
@@ -129,9 +140,6 @@ z2_grid=z2_grid./mean_z2; % Normalise the grid on z2 (so that the mean of z2 is 
 
 
 %% Define aprime function for KiwiSaver
-Params.ks_r=0.08; % Long-term growth estimate
-Params.ks_employee=0.05; % Employee contribution
-Params.ks_employer=0.05; % Employer contribution
 ks_primeFn=@(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ks_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
@@ -140,12 +148,11 @@ simoptions.a_grid=a_grid;
 simoptions.z_grid=z_gridvals_J;
 
 %% Now, create the return function
-Params.energy_shock=0;
 DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
-ReturnFn=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock) ...
-    QEA_ReturnFn(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock);
+ReturnFn=@(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_budget,energy_shock,pv_share_price) ...
+    QEA_ReturnFn(h,ks_out,aprime,pvprime,a,pv,ks_balance,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_budget,energy_shock,pv_share_price);
 
 %% Solve the value function iteration problem
 disp('Solve for Value fn and Policy fn using ValueFnIter command')
@@ -186,6 +193,11 @@ FnsToEvaluate.fractionwithmedicalexpenses=@(h,ks_out,aprime,pvprime,a,pv,ks_bala
 
 %% Calculate the life-cycle profiles
 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions);
+AgeConditionalStats.title="Life Cycle Profile: Assets Allocations All Shocks";
+AgeConditionalStats.legend={'KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 % Note: Because we have simoptions.ExogShockFn, what we input for z1_grid will just be ignored.
 
 % For example
@@ -245,6 +257,11 @@ jequaloneDist_no_medical(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_medical; % All age
 
 StationaryDist_no_medical=StationaryDist_FHorz_Case1(jequaloneDist_no_medical,AgeWeightsParamNames,Policy_no_medical,n_d,n_a,n_z,N_j,pi_z_no_medical_J,Params,simoptions_no_medical);
 AgeConditionalStats_no_medical=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_medical,Policy_no_medical,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_medical_J,simoptions_no_medical);
+AgeConditionalStats_no_medical.title="Life Cycle Profile: Assets Allocations No Medical Shocks";
+AgeConditionalStats_no_medical.legend={'KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 
 %% Solve the model again, but without unemployment shocks, to compare asset profiles
 vfoptions_no_unemployment=vfoptions;
@@ -263,7 +280,11 @@ jequaloneDist_no_unemployment(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_unemployment;
 
 StationaryDist_no_unemployment=StationaryDist_FHorz_Case1(jequaloneDist_no_unemployment,AgeWeightsParamNames,Policy_no_unemployment,n_d,n_a,n_z,N_j,pi_z_no_unemployment_J,Params,simoptions_no_unemployment);
 AgeConditionalStats_no_unemployment=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_unemployment,Policy_no_unemployment,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_unemployment_J,simoptions_no_unemployment);
-
+AgeConditionalStats_no_unemployment.title="Life Cycle Profile: Assets Allocations No Unemployment Shocks";
+AgeConditionalStats_no_unemployment.legend={'KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 
 %% Solve the model again, but without any shocks, to compare asset profiles
 vfoptions_no_shocks=vfoptions;
@@ -282,6 +303,11 @@ jequaloneDist_no_shocks(1,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_shocks; % All agent
 
 StationaryDist_no_shocks=StationaryDist_FHorz_Case1(jequaloneDist_no_shocks,AgeWeightsParamNames,Policy_no_shocks,n_d,n_a,n_z,N_j,pi_z_no_shocks_J,Params,simoptions_no_shocks);
 AgeConditionalStats_no_shocks=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_shocks,Policy_no_shocks,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_shocks_J,simoptions_no_shocks);
+AgeConditionalStats_no_shocks.title="Life Cycle Profile: Assets Allocations No Shocks (At All)";
+AgeConditionalStats_no_shocks.legend={'KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 
 Params.energy_shock=1.5;
 
@@ -289,17 +315,21 @@ Params.energy_shock=1.5;
 
 StationaryDist_energy_only=StationaryDist_FHorz_Case1(jequaloneDist_no_shocks,AgeWeightsParamNames,Policy_energy_only,n_d,n_a,n_z,N_j,pi_z_no_shocks_J,Params,simoptions_no_shocks);
 AgeConditionalStats_energy_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_energy_only,Policy_energy_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_shocks_J,simoptions_no_shocks);
-
+AgeConditionalStats_energy_only.title="Life Cycle Profile: Assets Allocations Energy Only Shocks";
+AgeConditionalStats_energy_only.legend={'KiwiSaver Balance (ks\_balance)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 
 
 %% Plot the results
+ACSvec=[AgeConditionalStats,AgeConditionalStats_no_medical,AgeConditionalStats_no_unemployment,AgeConditionalStats_no_shocks,AgeConditionalStats_energy_only];
+
 figure(2)
-plot(1:1:Params.J,AgeConditionalStats.assets.Mean, ...
-    1:1:Params.J,AgeConditionalStats_no_medical.assets.Mean, ...
-    1:1:Params.J,AgeConditionalStats_no_unemployment.assets.Mean, ...
-    1:1:Params.J,AgeConditionalStats_no_shocks.assets.Mean, ...
-    1:1:Params.J,AgeConditionalStats_energy_only.assets.Mean ...
-    );
+hold on
+for ii=1:length(ACSvec)
+    plot(1:1:Params.J,ACSvec(ii).assets.Mean);
+end
 title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho_z2 = %.3f;\nParams.sigma_epsilon_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
 legend('Unemployment+Medical Expense Shocks', ...
     'Unemployment but No Medical Shocks', ...
@@ -307,46 +337,24 @@ legend('Unemployment+Medical Expense Shocks', ...
     'No Shocks (none at all)', ...
     'Energy Only Shocks', ...
     'Location','northeast');
+hold off
 
-figure(3)
-area(1:1:Params.J, [AgeConditionalStats.ks_balance.Mean; AgeConditionalStats.pv.Mean; AgeConditionalStats.assets.Mean]);
-title("Life Cycle Profile: Assets Allocations All Shocks")
-legend('KiwiSaver Balance (ks\_balance)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast');
+for ii=1:length(ACSvec)
+    figure(2+ii)
+    area(1:1:Params.J, [ACSvec(ii).ks_balance.Mean; ACSvec(ii).pv.Mean*Params.pv_share_price; ACSvec(ii).assets.Mean]);
+    title(ACSvec(ii).title)
+    legend(ACSvec(ii).legend{:})
+    if any(ACSvec(ii).assets.Maximum==asset_grid(end))
+        warning(sprintf("assets maxed out ACSvec(%d)", ii));
+    end
+    if any(ACSvec(ii).pv.Maximum==pv_grid(end))
+        warning(sprintf("pv shares maxed out ACSvec(%d)", ii));
+    end
+    if any(ACSvec(ii).ks_balance.Maximum==ks_grid(end))
+        warning(sprintf("ks_balance maxed out ACSvec(%d)", ii));
+    end
+end
 
-figure(4)
-area(1:1:Params.J, [AgeConditionalStats_no_medical.ks_balance.Mean; AgeConditionalStats_no_medical.pv.Mean; AgeConditionalStats_no_medical.assets.Mean]);
-title("Life Cycle Profile: Assets Allocations No Medical Shocks")
-legend('KiwiSaver Balance (ks\_balance)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast');
-
-figure(5)
-area(1:1:Params.J, [AgeConditionalStats_no_unemployment.ks_balance.Mean; AgeConditionalStats_no_unemployment.pv.Mean; AgeConditionalStats_no_unemployment.assets.Mean]);
-title("Life Cycle Profile: Assets Allocations No Unemployment Shocks")
-legend('KiwiSaver Balance (ks\_balance)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast');
-
-figure(6)
-area(1:1:Params.J, [AgeConditionalStats_no_shocks.ks_balance.Mean; AgeConditionalStats_no_shocks.pv.Mean; AgeConditionalStats_no_shocks.assets.Mean]);
-title("Life Cycle Profile: Assets Allocations No Shocks (At All)")
-legend('KiwiSaver Balance (ks\_balance)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast');
-
-figure(7)
-area(1:1:Params.J, [AgeConditionalStats_energy_only.ks_balance.Mean; AgeConditionalStats_energy_only.pv.Mean; AgeConditionalStats_energy_only.assets.Mean]);
-title("Life Cycle Profile: Assets Allocations Energy Only Shocks")
-legend('KiwiSaver Balance (ks\_balance)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast');
 
 % Notice that medical expense shocks late in life cause elderly households
 % to hold more assets (as self-insurance against medical expense shocks)
