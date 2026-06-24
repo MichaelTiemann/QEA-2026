@@ -7,6 +7,9 @@ single_0=single(0); single_1=single(1);
 if agej<Jr && ks_out>single_0 % If working age, no KiwiSaver redemptions allowed
     return
 end
+if pv+pvprime>0
+    return
+end
 
 pv_cost_delta=w*(pv-pvprime)*pv_share_price;
 
@@ -20,8 +23,9 @@ else
     energy_cost=energy_cost*(single_1-pv/5);
 end
 energy=energy_income-energy_cost+pv_cost_delta;
+energy=0;
 
-if agej<1
+if agej<Jr-1
     % No energy costs / no kiwisaver investment
     income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
     c=income+(single_1+r)*a-aprime;

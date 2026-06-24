@@ -23,9 +23,9 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=[21,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
-n_a=[51,21,11]; % Endogenous asset holdings: assets, pv, kiwisaver
-n_z=[2,9]; % Exogenous labor productivity units shock; energy price shocks
+n_d=[21,3]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_a=[51,11,3]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_z=[2,3]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 
 %% Parameters
@@ -83,7 +83,7 @@ Params.wg3=Params.sigma; % By using the same curvature as the utility of consump
 
 
 %% Grids
-vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
+vfoptions.precision='double'; simoptions.precision=vfoptions.precision;
 cast2precision=str2func(vfoptions.precision);
 vfoptions.lowmemory=3;
 
@@ -91,12 +91,12 @@ vfoptions.lowmemory=3;
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
 a_grid_cubed=linspace(zero,1,floor(n_a(1)/4)+1).^3;
-a_grid_linear=linspace(cast2precision(1),20,ceil(3*n_a(1)/4));
+a_grid_linear=linspace(cast2precision(1),10,ceil(3*n_a(1)/4));
 asset_grid=[a_grid_cubed, a_grid_linear(2:end)]';
 
-pv_grid=[linspace(zero,9,floor(n_a(2)/2)),linspace(10,30,floor(n_a(2)/2)+1)]';
+pv_grid=[linspace(zero,9,floor(n_a(2)/2)),linspace(10,20,floor(n_a(2)/2)+1)]';
 
-ks_grid=linspace(zero,40,n_a(3))';
+ks_grid=linspace(zero,20,n_a(3))';
 
 a_grid=[asset_grid; pv_grid; ks_grid];
 
@@ -137,7 +137,7 @@ z2_grid=z2_grid./mean_z2; % Normalise the grid on z2 (so that the mean of z2 is 
 % Both value function and simulations need to know about the age-dependence exogenous shocks
 
 [z_gridvals_J,pi_z_J,statdist_z1,vfoptions]=Setup_QEA(n_z,z2_grid,pi_z2,Params,vfoptions.ExogShockFn1,vfoptions);
-
+simoptions.alreadygridvals=vfoptions.alreadygridvals;
 
 %% Define aprime function for KiwiSaver
 ks_primeFn=@(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
@@ -247,7 +247,7 @@ vfoptions_no_medical.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn1(agej,
 % We will evaluate the ExogShockFn at agej=1, just because I want to use
 % the stationary distribution as the initial distribution for agents.
 [z_gridvals_no_medical_J,pi_z_no_medical_J,statdist_z1_no_medical,vfoptions_no_medical]=Setup_QEA(n_z,z2_grid,pi_z2,Params,vfoptions_no_medical.ExogShockFn1,vfoptions);
-
+simoptions_no_medical.alreadygridvals=vfoptions_no_medical.alreadygridvals;
 [V_no_medical, Policy_no_medical]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_no_medical_J, pi_z_no_medical_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_no_medical);
 
 %% Initial distribution of agents at birth (j=1)
@@ -270,6 +270,7 @@ vfoptions_no_unemployment.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn2(
 % simoptions_no_unemployment.ExogShockFn=vfoptions_no_unemployment.ExogShockFn;
 
 [z_gridvals_no_unemployment_J,pi_z_no_unemployment_J,statdist_z1_no_unemployment,vfoptions_no_unemployment]=Setup_QEA(n_z,z2_grid,pi_z2,Params,vfoptions_no_unemployment.ExogShockFn1,vfoptions);
+simoptions_no_unemployment.alreadygridvals=vfoptions_no_unemployment.alreadygridvals;
 
 [V_no_unemployment, Policy_no_unemployment]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_no_unemployment_J, pi_z_no_unemployment_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_no_unemployment);
 
@@ -293,6 +294,7 @@ vfoptions_no_shocks.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn3(agej,J
 % simoptions_no_shocks.ExogShockFn=vfoptions_no_shocks.ExogShockFn;
 
 [z_gridvals_no_shocks_J,pi_z_no_shocks_J,statdist_z1_no_shocks,vfoptions_no_shocks]=Setup_QEA(n_z,z2_grid,pi_z2,Params,vfoptions_no_shocks.ExogShockFn1,vfoptions);
+simoptions_no_shocks.alreadygridvals=vfoptions_no_shocks.alreadygridvals;
 
 [V_no_shocks, Policy_no_shocks]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_no_shocks_J, pi_z_no_shocks_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_no_shocks);
 

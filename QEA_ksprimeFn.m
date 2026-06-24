@@ -1,7 +1,10 @@
 function ks_prime=QEA_ksprimeFn(h,ks_out,ks_balance,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j)
 
+ks_prime=ks_balance;
+return
+
 ks_growth=ks_balance*ks_r;
-if agej<1
+if agej<Jr-1
     % No contributions (from either employee or employer before Year 1)
     ks_prime=ks_balance;
 elseif agej<Jr % If working age, calculate contributions
