@@ -21,7 +21,11 @@ else
 end
 energy=energy_income-energy_cost+pv_cost_delta;
 
-if agej<Jr % If working age
+if agej<1
+    % No energy costs / no kiwisaver investment
+    income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
+    c=income+(single_1+r)*a-aprime;
+elseif agej<Jr % If working age
     income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
     % Kiwisaver takes 5% out of income
     c=income*(single_1-ks_employee)+energy+(single_1+r)*a-aprime;
