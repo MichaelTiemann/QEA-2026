@@ -23,9 +23,9 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=[31,5]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
-n_a=[51,11,5]; % Endogenous asset holdings: assets, pv, kiwisaver
-n_z=[2,9]; % Exogenous labor productivity units shock; energy price shocks
+n_d=[23,7]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_a=[27,11,7]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_z=[2,7]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 
 %% Parameters
@@ -44,7 +44,7 @@ Params.r=0.05; % Interest rate (0.05 is 5%)
 Params.energy_shock=0; % If 1, shock returns to mean; if > 1, shock increases price by (energy_shock-1)
 % Median Kiwi income is roughly $120K/hh, so $20K 5kW system with 10kWh battery is 1/6th income.
 % One fifth share of that (1kW+2kWh) is 1/30th income.
-Params.pv_share_price=1/30;
+Params.pv_share_price=1/20;
 
 % KiwiSaver Scheme
 Params.ks_r=0.07; % Long-term growth estimate
@@ -84,18 +84,18 @@ Params.wg3=Params.sigma; % By using the same curvature as the utility of consump
 %% Grids
 vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
 cast2precision=str2func(vfoptions.precision);
-vfoptions.lowmemory=1;
+vfoptions.lowmemory=0;
 
 % The ^3 means that there are more points near 0 and near 16. We know from theory that the value function will be more 'curved' near zero assets,
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
 a_grid_cubed=linspace(zero,1,floor(n_a(1)/4)+1).^3;
-a_grid_linear=linspace(cast2precision(1),10,ceil(3*n_a(1)/4));
+a_grid_linear=linspace(cast2precision(1),20,ceil(3*n_a(1)/4));
 asset_grid=[a_grid_cubed, a_grid_linear(2:end)]';
 
 pv_grid=[linspace(0,4,floor(n_a(2)/2)),linspace(5,15,floor(n_a(2)/2)+1)]';
 
-ks_grid=linspace(zero,20,n_a(3))';
+ks_grid=linspace(zero,40,n_a(3))';
 
 a_grid=[asset_grid; pv_grid; ks_grid];
 
@@ -126,8 +126,8 @@ vfoptions.ExogShockFn1=@(agej,Jr) LifeCycleModel21_ExogShockFn(agej,Jr);
 % Discretize the AR(1) process z2
 % Exogenous shock process, z2: AR1 on labor productivity units
 % Note this is not dependent on age
-Params.rho_z2=0.5;
-Params.sigma_epsilon_z2=0.15;
+Params.rho_z2=0.25; % 0.25 creates more tail-risk in pi_z vs 0.5
+Params.sigma_epsilon_z2=0.25; % 0.5 creates more extreme values in z_grid vs 0.25
 [z2_grid,pi_z2]=discretizeAR1_FarmerToda(0,Params.rho_z2,Params.sigma_epsilon_z2,n_z(2));
 z2_grid=exp(z2_grid); % Take exponential of the grid
 [mean_z2,~,~,~]=MarkovChainMoments(z2_grid,pi_z2); % Calculate the mean of the grid so as can normalise it
@@ -329,7 +329,7 @@ AgeConditionalStats_no_shocks.legend={'KiwiSaver Balance (ks)', ...
     'Assets (a)', ...
     'Location','northeast'};
 
-Params.energy_shock=1.5;
+Params.energy_shock=3;
 
 [V_energy_only, Policy_energy_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_no_shocks_J, pi_z_no_shocks_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_no_shocks);
 

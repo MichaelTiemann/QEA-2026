@@ -35,10 +35,10 @@ employment_factor=(z1+single_1)/single(2); % full rate at full employment; half-
 nongrid_expenses=(housing+food+discretionary*employment_factor+taxes)*w_factor;
 grid_budget=(utilities+transport*employment_factor)*w_factor;
 % Calculate energy expense/income/investment
-grid_expenses=grid_budget*(energy_shock*(z2-single_1)+single(~energy_shock));
+grid_expenses=grid_budget*(energy_shock*z2+single(~energy_shock));
 if pv>5
     % grid_income is 1/2 the cost rate once above self-sufficient 5kW+10kWh system
-    grid_income=grid_budget*(max(single_1,energy_shock*(z2-single_1)))*(pv-single(5))/10;
+    grid_income=grid_budget*(max(single_1,energy_shock*z2))*(pv-single(5))/10;
     grid_expenses=single_0;
 else
     grid_income=single_0;
