@@ -26,8 +26,8 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=[23,13]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
-n_a=[29,11,83]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_d=[29,13]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_a=[83,7,97]; % Endogenous asset holdings: assets, pv, kiwisaver
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions.lowmemory=3;
@@ -54,15 +54,15 @@ Params.pv_share_price=1/30;
 
 % KiwiSaver Scheme
 Params.ks_r=0.07; % Long-term growth estimate
-Params.ks_employee=0.05; % Employee contribution
-Params.ks_employer=0.05; % Employer contribution
+Params.ks_employee=0.035; % Employee contribution
+Params.ks_employer=0.035; % Employer contribution
 
 % Demographics
 Params.agej=1:1:Params.J; % Is a vector of all the agej: 1,2,3,...,J
 Params.Jr=46;
 
 % Pensions
-Params.pension=0.3;
+Params.pension=0.2;
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -103,20 +103,23 @@ cast2precision=str2func(vfoptions.precision);
 % The ^3 means that there are more points near 0 and near 16. We know from theory that the value function will be more 'curved' near zero assets,
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
-a_grid_cubed=linspace(cast2precision(-1.2),1,floor(n_a(1)/2)+1).^3; % If the debt well is not deep enough, -Inf kills those that touch bottom
+a_grid_cubed=linspace(cast2precision(-1.4),0,floor(n_a(1)/4)+1).^3; % If the debt well is not deep enough, -Inf kills those that touch bottom
 [~,zero_asset_index]=min(abs(a_grid_cubed));
 a_grid_cubed(zero_asset_index)=0;
-a_grid_linear=linspace(cast2precision(1),20,ceil(n_a(1)/2));
-asset_grid=[a_grid_cubed, a_grid_linear(2:end)]';
+a_grid_exp=exp(linspace(cast2precision(-3),log(10),ceil(3*n_a(1)/4)))-linspace(cast2precision(exp(-3)),0,ceil(3*n_a(1)/4));
+asset_grid=[a_grid_cubed, a_grid_exp(2:end)]';
 
-pv_grid=[linspace(0,4,floor(n_a(2)/2)),linspace(5,15,floor(n_a(2)/2)+1)]';
+n_a(2)=1;
+pv_grid=(0:n_a(2)-1)';
 
 % We want a grid that captures both the incremental contributions over time
 % and also the compound interest.  Note that with 5% contribution plus 5%
 % employer match, agents can invest 10% of w before they retire.
 % cumsum(0.1*ones(1,45).*(1.07.^(45:-1:1))) is 30*w if no shocks.
 % Grid is bounded by 0 and exp(-4)==0.0183 is entry-point for low-earners
-ks_grid=[0, exp(linspace(-4,log(20),n_a(3)-1))+linspace(0,20,n_a(3)-1)]';
+ks_max=ceil(1.6*sum((Params.ks_employee+Params.ks_employer)*Params.kappa_j(1:Params.Jr-1).*((1+Params.ks_r).^(Params.Jr-1:-1:1)-1)))
+ks_contrib_sum=ceil(sum(Params.ks_employee*Params.kappa_j(1:Params.Jr-1)))
+ks_grid=[0, exp(linspace(-4,log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
 
 a_grid=[asset_grid; pv_grid; ks_grid];
 
@@ -392,19 +395,19 @@ for ii=1:length(ACSvec)
     area(1:1:Params.J, [ACSvec(ii).ks.Mean; ACSvec(ii).pv.Mean*Params.pv_share_price; ACSvec(ii).assets.Mean]);
     title(ACSvec(ii).title)
     legend(ACSvec(ii).legend{:})
-    if any(ACSvec(ii).assets.QuantileCutoffs(Params.Q_min,:)==asset_grid(1))
+    if any(ACSvec(ii).assets.QuantileCutoffs(1,:)==asset_grid(1))
         warning(sprintf("assets (Minimum) hit debt floor ACSvec(%d)", ii));
     end
     if any(ACSvec(ii).assets.Mean==asset_grid(1))
         error(sprintf("assets (Mean) hit debt floor ACSvec(%d)", ii));
     end
-    if any(ACSvec(ii).assets.QuantileCutoffs(Params.Q_max,:)==asset_grid(end))
+    if any(ACSvec(ii).assets.QuantileCutoffs(end,:)==asset_grid(end))
         warning(sprintf("assets maxed out ACSvec(%d)", ii));
     end
-    if any(ACSvec(ii).pv.QuantileCutoffs(Params.Q_max,:)==pv_grid(end))
+    if any(ACSvec(ii).pv.QuantileCutoffs(end,:)==pv_grid(end))
         warning(sprintf("pv shares maxed out ACSvec(%d)", ii));
     end
-    if any(ACSvec(ii).ks.QuantileCutoffs(Params.Q_max,:)==ks_grid(end))
+    if any(ACSvec(ii).ks.QuantileCutoffs(end,:)==ks_grid(end))
         warning(sprintf("ks maxed out ACSvec(%d)", ii));
     end
 end
@@ -441,8 +444,10 @@ end
 function Subplot_ACS_profiles(ACSvec, Params, ii, fieldname)
 hold on
 plot(1:1:Params.J,ACSvec(ii).(fieldname).Mean)
+plot(1:1:Params.J,ACSvec(ii).(fieldname).Minimum)
 plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileCutoffs(Params.Q_min,:))
 plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileCutoffs(Params.Q_max,:))
+plot(1:1:Params.J,ACSvec(ii).(fieldname).Maximum)
 hold off
 
 end
