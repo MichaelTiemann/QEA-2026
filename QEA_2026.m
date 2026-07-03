@@ -39,7 +39,7 @@ n_d=[27,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_max=64;
 ks_max=16*21;
-n_a=[117,7,43]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_a=[89,7,43]; % Endogenous asset holdings: assets, pv, kiwisaver
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions.lowmemory=3;
@@ -115,7 +115,7 @@ cast2precision=str2func(vfoptions.precision);
 % The ^3 means that there are more points near 0 and near 16. We know from theory that the value function will be more 'curved' near zero assets,
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
-a_grid_cubed=linspace(cast2precision(-1),0,floor(n_a(1)/4)+1).^3; % If the debt well is not deep enough, -Inf kills those that touch bottom
+a_grid_cubed=linspace(cast2precision(-1.2),0,floor(n_a(1)/4)+1).^3; % If the debt well is not deep enough, -Inf kills those that touch bottom
 [~,zero_asset_index]=min(abs(a_grid_cubed));
 a_grid_cubed(zero_asset_index)=0;
 a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_max),ceil(3*n_a(1)/4)))-linspace(cast2precision(exp(-2.5)),0,ceil(3*n_a(1)/4));
@@ -241,6 +241,7 @@ figure(1)
 hold on
 plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Mean)
 plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Minimum)
+plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Maximum)
 hold off
 title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho\\_z2 = %.3f;\nParams.sigma\\_epsilon\\_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
 legend('Unemployment Only Shocks (Mean)', 'Unemployment Only Shocks (Minimum)')

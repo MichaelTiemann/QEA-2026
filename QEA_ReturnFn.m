@@ -83,7 +83,7 @@ else
     F=(c-1)*1e3;
 end
 if aprime<0
-    F=F+aprime*1e4; % Disfavor debt so we used the least of it possible
+    F=F*1e-3+aprime*1e4; % Disfavor debt so we used the least of it possible
 end
 
 % add the warm glow to the return, but only near end of life
