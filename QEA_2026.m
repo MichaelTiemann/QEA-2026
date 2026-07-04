@@ -39,7 +39,7 @@ n_d=[27,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_max=64;
 ks_max=16*21;
-n_a=[89,7,43]; % Endogenous asset holdings: assets, pv, kiwisaver
+n_a=[83,10,43]; % Endogenous asset holdings: assets, pv, kiwisaver
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions.lowmemory=3;
@@ -74,7 +74,7 @@ Params.agej=1:1:Params.J; % Is a vector of all the agej: 1,2,3,...,J
 Params.Jr=46;
 
 % Pensions
-Params.pension=0.2;
+Params.pension=0.3;
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -115,13 +115,12 @@ cast2precision=str2func(vfoptions.precision);
 % The ^3 means that there are more points near 0 and near 16. We know from theory that the value function will be more 'curved' near zero assets,
 % and putting more points near curvature (where the derivative changes the most) increases accuracy of results.
 zero=cast2precision(0);
-a_grid_cubed=linspace(cast2precision(-1.2),0,floor(n_a(1)/4)+1).^3; % If the debt well is not deep enough, -Inf kills those that touch bottom
-[~,zero_asset_index]=min(abs(a_grid_cubed));
-a_grid_cubed(zero_asset_index)=0;
-a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_max),ceil(3*n_a(1)/4)))-linspace(cast2precision(exp(-2.5)),0,ceil(3*n_a(1)/4));
-asset_grid=[a_grid_cubed, a_grid_exp(2:end)]';
+a_grid_debt=1-exp(linspace(log(cast2precision(3)),0,floor(n_a(1)/4)+1));
+a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_max),ceil(3*n_a(1)/4)))-linspace(exp(cast2precision(-2.5)),0,ceil(3*n_a(1)/4));
+asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
+[~,zero_asset_index]=min(abs(asset_grid));
+asset_grid(zero_asset_index)=0;
 
-n_a(2)=1;
 pv_grid=(0:n_a(2)-1)';
 
 % We want a grid that captures both the incremental contributions over time
@@ -205,69 +204,6 @@ FnsToEvaluate.fractionwithmedicalexpenses=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z
 % Now build z_gridvals_J and pi_z_J, setting vfoptions and simoptions flags appropriately
 [z_gridvals_unemp_only_J,pi_z_unemp_only_J,statdist_z1_unemp_only,vfoptions_unemp_only,simoptions_unemp_only]=Setup_QEA(n_z,z2_grid,pi_z2,Params,@(agej,Jr) LifeCycleModel21_ExogShockFn1(agej,Jr),vfoptions,simoptions);
 
-%% Solve the model with unemployment but no medical shocks
-% Use return function, but with appropriate ExogShockFn
-% We will evaluate the ExogShockFn at agej=1, just because I want to use
-% the stationary distribution as the initial distribution for agents.
-[V_unemp_only, Policy_unemp_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_unemp_only_J, pi_z_unemp_only_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_unemp_only);
-
-%% Initial distribution of agents at birth (j=1)
-% Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist_unemp_only=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
-jequaloneDist_unemp_only(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_unemp_only; % All agents start with zero assets, zero pv, and zero ks with z drawn from its stationary distribution
-
-StationaryDist_unemp_only=StationaryDist_FHorz_Case1(jequaloneDist_unemp_only,AgeWeightsParamNames,Policy_unemp_only,n_d,n_a,n_z,N_j,pi_z_unemp_only_J,Params,simoptions_unemp_only);
-StationaryDist_unemp_only(isinf(V_unemp_only))=0; % If the ReturnFn forbids it, it is forbidden
-
-AgeConditionalStats_unemp_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_unemp_only,Policy_unemp_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_unemp_only_J,simoptions_unemp_only);
-AgeConditionalStats_unemp_only.title="Life Cycle Profile: Assets Allocations No Medical Shocks";
-AgeConditionalStats_unemp_only.legend={'KiwiSaver Balance (ks)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast'};
-
-
-% For example
-% AgeConditionalStats.earnings.Mean
-% There are things other than Mean (Median, Gini, percentiles, etc.); in
-% earlier deterministic models all agents were identical at each age so
-% those were trivial, but now that we have an idiosyncratic shock z they
-% are meaningful and worth looking at.
-
-if ishandle(1)
-    clf(1)
-end
-figure(1)
-hold on
-plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Mean)
-plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Minimum)
-plot(1:1:Params.J,AgeConditionalStats_unemp_only.assets.Maximum)
-hold off
-title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho\\_z2 = %.3f;\nParams.sigma\\_epsilon\\_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
-legend('Unemployment Only Shocks (Mean)', 'Unemployment Only Shocks (Minimum)')
-
-
-%% Now compute value function with medical shocks (but not energy shocks nor unemployment shocks)
-[z_gridvals_med_only_J,pi_z_med_only_J,statdist_z1_med_only,vfoptions_med_only,simoptions_med_only]=Setup_QEA(n_z,z2_grid,pi_z2,Params,@(agej,Jr) LifeCycleModel21_ExogShockFn2(agej,Jr),vfoptions,simoptions);
-tic;
-[V_med_only, Policy_med_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_med_only_J, pi_z_med_only_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_med_only);
-toc
-
-%% Initial distribution of agents at birth (j=1)
-% Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
-jequaloneDist_med_only=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
-jequaloneDist_med_only(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_med_only; % All agents start with zero assets, with z drawn from its stationary distribution
-
-StationaryDist_med_only=StationaryDist_FHorz_Case1(jequaloneDist_med_only,AgeWeightsParamNames,Policy_med_only,n_d,n_a,n_z,N_j,pi_z_med_only_J,Params,simoptions_med_only);
-StationaryDist_med_only(isinf(V_med_only))=0; % If the ReturnFn forbids it, it is forbidden
-
-AgeConditionalStats_med_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_med_only,Policy_med_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_med_only_J,simoptions_med_only);
-AgeConditionalStats_med_only.title="Life Cycle Profile: Assets Allocations No Unemployment Shocks";
-AgeConditionalStats_med_only.legend={'KiwiSaver Balance (ks)', ...
-    'Solar PV Shares (pv)', ...
-    'Assets (a)', ...
-    'Location','northeast'};
-
 
 %% Solve the model again, with all shocks, to compare asset profiles
 [z_gridvals_all_shocks_J,pi_z_all_shocks_J,statdist_z1_all_shocks,vfoptions_all_shocks,simoptions_all_shocks]=Setup_QEA(n_z,z2_grid,pi_z2,Params,@(agej,Jr) LifeCycleModel21_ExogShockFn(agej,Jr),vfoptions,simoptions);
@@ -282,7 +218,6 @@ jequaloneDist_all_shocks=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put 
 jequaloneDist_all_shocks(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_all_shocks; % All agents start with zero assets, no pvs, no kiwisaver, with z drawn from its stationary distribution
 
 StationaryDist_all_shocks=StationaryDist_FHorz_Case1(jequaloneDist_all_shocks,AgeWeightsParamNames,Policy_all_shocks,n_d,n_a,n_z,N_j,pi_z_all_shocks_J,Params,simoptions_all_shocks);
-StationaryDist_all_shocks(isinf(V_all_shocks))=0; % If the ReturnFn forbids it, it is forbidden
 
 %% Calculate the life-cycle profiles for all shocks
 AgeConditionalStats_all_shocks=LifeCycleProfiles_FHorz_Case1(StationaryDist_all_shocks,Policy_all_shocks,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_all_shocks_J,simoptions_all_shocks);
@@ -294,6 +229,70 @@ AgeConditionalStats_all_shocks.legend={'KiwiSaver Balance (ks)', ...
 
 % Notice that medical expense shocks late in life cause elderly households
 % to hold more assets (as self-insurance against medical expense shocks)
+
+
+% For example
+% AgeConditionalStats.earnings.Mean
+% There are things other than Mean (Median, Gini, percentiles, etc.); in
+% earlier deterministic models all agents were identical at each age so
+% those were trivial, but now that we have an idiosyncratic shock z they
+% are meaningful and worth looking at.
+
+if ishandle(1)
+    clf(1)
+end
+figure(1)
+hold on
+plot(1:1:Params.J,AgeConditionalStats_all_shocks.assets.Mean)
+plot(1:1:Params.J,AgeConditionalStats_all_shocks.assets.Minimum)
+plot(1:1:Params.J,AgeConditionalStats_all_shocks.assets.Maximum)
+plot(1:1:Params.J,AgeConditionalStats_all_shocks.ks.Mean,'-o')
+plot(1:1:Params.J,AgeConditionalStats_all_shocks.ks.Minimum,'-d')
+hold off
+title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho\\_z2 = %.3f;\nParams.sigma\\_epsilon\\_z2 = %.3f", Params.rho_z2, Params.sigma_epsilon_z2))
+legend('All Shocks (Mean)', 'All Shocks (Minimum)')
+
+
+%% Solve the model with unemployment but no medical shocks
+% Use return function, but with appropriate ExogShockFn
+% We will evaluate the ExogShockFn at agej=1, just because I want to use
+% the stationary distribution as the initial distribution for agents.
+[V_unemp_only, Policy_unemp_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_unemp_only_J, pi_z_unemp_only_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_unemp_only);
+
+%% Initial distribution of agents at birth (j=1)
+% Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
+jequaloneDist_unemp_only=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist_unemp_only(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_unemp_only; % All agents start with zero assets, zero pv, and zero ks with z drawn from its stationary distribution
+
+StationaryDist_unemp_only=StationaryDist_FHorz_Case1(jequaloneDist_unemp_only,AgeWeightsParamNames,Policy_unemp_only,n_d,n_a,n_z,N_j,pi_z_unemp_only_J,Params,simoptions_unemp_only);
+
+AgeConditionalStats_unemp_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_unemp_only,Policy_unemp_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_unemp_only_J,simoptions_unemp_only);
+AgeConditionalStats_unemp_only.title="Life Cycle Profile: Assets Allocations No Medical Shocks";
+AgeConditionalStats_unemp_only.legend={'KiwiSaver Balance (ks)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
+
+
+%% Now compute value function with medical shocks (but not energy shocks nor unemployment shocks)
+[z_gridvals_med_only_J,pi_z_med_only_J,statdist_z1_med_only,vfoptions_med_only,simoptions_med_only]=Setup_QEA(n_z,z2_grid,pi_z2,Params,@(agej,Jr) LifeCycleModel21_ExogShockFn2(agej,Jr),vfoptions,simoptions);
+tic;
+[V_med_only, Policy_med_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_med_only_J, pi_z_med_only_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_med_only);
+toc
+
+%% Initial distribution of agents at birth (j=1)
+% Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
+jequaloneDist_med_only=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
+jequaloneDist_med_only(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_med_only; % All agents start with zero assets, with z drawn from its stationary distribution
+
+StationaryDist_med_only=StationaryDist_FHorz_Case1(jequaloneDist_med_only,AgeWeightsParamNames,Policy_med_only,n_d,n_a,n_z,N_j,pi_z_med_only_J,Params,simoptions_med_only);
+
+AgeConditionalStats_med_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_med_only,Policy_med_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_med_only_J,simoptions_med_only);
+AgeConditionalStats_med_only.title="Life Cycle Profile: Assets Allocations No Unemployment Shocks";
+AgeConditionalStats_med_only.legend={'KiwiSaver Balance (ks)', ...
+    'Solar PV Shares (pv)', ...
+    'Assets (a)', ...
+    'Location','northeast'};
 
 
 %% Solve the value function iteration problem with no age-dependent shocks
@@ -311,7 +310,6 @@ jequaloneDist_no_shocks=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put n
 jequaloneDist_no_shocks(zero_asset_index,1,1,:,(n_z(2)+1)/2)=statdist_z1_no_shocks; % All agents start with zero assets, zero pv, empty ks, with z drawn from its stationary distribution
 
 StationaryDist_no_shocks=StationaryDist_FHorz_Case1(jequaloneDist_no_shocks,AgeWeightsParamNames,Policy_no_shocks,n_d,n_a,n_z,N_j,pi_z_no_shocks_J,Params,simoptions_no_shocks);
-StationaryDist_no_shocks(isinf(V_no_shocks))=0; % If the ReturnFn forbids it, it is forbidden
 
 AgeConditionalStats_no_shocks=LifeCycleProfiles_FHorz_Case1(StationaryDist_no_shocks,Policy_no_shocks,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_shocks_J,simoptions_no_shocks);
 AgeConditionalStats_no_shocks.title="Life Cycle Profile: Assets Allocations No Shocks (At All)";
@@ -326,7 +324,6 @@ Params.energy_shock=2;
 [V_energy_only, Policy_energy_only]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_no_shocks_J, pi_z_no_shocks_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_no_shocks);
 
 StationaryDist_energy_only=StationaryDist_FHorz_Case1(jequaloneDist_no_shocks,AgeWeightsParamNames,Policy_energy_only,n_d,n_a,n_z,N_j,pi_z_no_shocks_J,Params,simoptions_no_shocks);
-StationaryDist_energy_only(isinf(V_energy_only))=0; % If the ReturnFn forbids it, it is forbidden
 
 AgeConditionalStats_energy_only=LifeCycleProfiles_FHorz_Case1(StationaryDist_energy_only,Policy_energy_only,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_no_shocks_J,simoptions_no_shocks);
 AgeConditionalStats_energy_only.title="Life Cycle Profile: Assets Allocations Energy Only Shocks";
