@@ -8,7 +8,7 @@
 
 %% How does VFI Toolkit think about this?
 %
-% Two decision variables:
+% One dual-use decision variable:
 %     h, labour hours worked;
 %     ks_out, fraction of retirement savings to liquidate
 % Two endogenous state variables:
@@ -26,7 +26,7 @@ Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age eas
 Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
-n_d=[27,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
+n_d=17; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
 % ks=73 good for 2x ks_max, a_max @ 4 (but use 10 for employment shocks)
 % ks=61 good for 3x ks_max, a_max @ 6
 % ks=61 good for 3x ks_max, a_max @ 6
@@ -37,12 +37,12 @@ n_d=[27,11]; % Endogenous labour choice (fraction of time worked); and kiwisaver
 % ks=23 ok+ for 512x ks_max, a_max @ 1024
 % ks=17 ok- for 2048x ks_max, a_max @ 2560
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
-a_max=64;
-ks_max=16*21;
-n_a=[83,10,43]; % Endogenous asset holdings: assets, pv, kiwisaver
+a_max=192;
+ks_max=64*21;
+n_a=[43,11,31]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
-vfoptions.lowmemory=3;
+vfoptions.lowmemory=1;
 Params.Q_min=2;
 Params.Q_max=19;
 
@@ -62,7 +62,7 @@ Params.r=0.05; % Interest rate (0.05 is 5%)
 Params.energy_shock=0; % If 1, shock returns to mean; if > 1, shock increases price by (energy_shock-1)
 % Median Kiwi income is roughly $120K/hh, so $20K 5kW system with 10kWh battery is 1/6th income.
 % One fifth share of that (1kW+2kWh) is 1/30th income.
-Params.pv_share_price=1/30;
+Params.pv_share_price=1/6;
 
 % KiwiSaver Scheme
 Params.ks_r=0.07; % Long-term growth estimate
@@ -136,24 +136,11 @@ ks_grid=exp(linspace(cast2precision(-2.5),log(ks_max),n_a(3)))';
 
 a_grid=[asset_grid; pv_grid; ks_grid];
 
-% Grid for labour choice
-h_grid=linspace(zero,1,n_d(1))'; % Notice that it is imposing the 0<=h<=1 condition implicitly
-% Grid for kiwisaver liquidation; limit to 50% total liquidation per year
-ks_out_grid=(linspace(zero,(1/2)^(1/3),n_d(2)).^3)';
-
-% tell the code how many d1, d2, and d3 there are
-% Idea is to distinguish three categories of decision variable:
-%  d1: decision is in the ReturnFn but not in aprimeFn
-%  d2: decision is in the aprimeFn but not in ReturnFn
-%  d3: decision is in both ReturnFn and in aprimeFn
-% Note: ReturnFn must use inputs (d1,d3,..) 
-%       aprimeFn must use inputs (d2,d3,..)
-% n_d must be set up as n_d=[n_d1, n_d2, n_d3]
-% d_grid must be set up as d_grid=[d1_grid; d2_grid; d3_grid];
-d_grid=[h_grid; ks_out_grid];
+% Grid for labour choice when agej<Jr; Grid for kiwisaver liquidation otherwise
+d_grid=linspace(zero,1,n_d)'; % Notice that it is imposing the 0<=d<=1 condition implicitly
 
 %% Define aprime function for KiwiSaver
-ks_primeFn=@(h,ks_out,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn(h,ks_out,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ks_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
@@ -171,8 +158,8 @@ simoptions.whichstats=[1,1,1,0,1,1,0];
 DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
-ReturnFn=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
-    QEA_ReturnFn(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
+    QEA_ReturnFn(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 
 %% Compute Z grids (z_gridvals_J and pi_z_J) manually
@@ -193,13 +180,13 @@ Params.energy_shock=0;
 %% Prepare to graph Life-Cycle Profiles (later)
 % FnsToEvaluate are how we say what we want to graph the life-cycles of
 % Like with return function, we have to include (generically, d,aprime,a,z) as first inputs, then just any relevant parameters.
-FnsToEvaluate.fractiontimeworked=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) h; % h is fraction of time worked
-FnsToEvaluate.earnings=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2,w,kappa_j) w*kappa_j*z1*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
-FnsToEvaluate.assets=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) a; % a is the current asset holdings
-FnsToEvaluate.pv=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) pv; % a is the current asset holdings
-FnsToEvaluate.ks=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) ks; % a is the current asset holdings
-FnsToEvaluate.fractionunemployed=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
-FnsToEvaluate.fractionwithmedicalexpenses=@(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.3); % indicator for z=0.3 medical shock
+FnsToEvaluate.fractiontimeworked=@(h,aprime,pvprime,a,pv,ks,z1,z2) h; % h is fraction of time worked
+FnsToEvaluate.earnings=@(h,aprime,pvprime,a,pv,ks,z1,z2,w,kappa_j) w*kappa_j*z1*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
+FnsToEvaluate.assets=@(d,aprime,pvprime,a,pv,ks,z1,z2) a; % a is the current asset holdings
+FnsToEvaluate.pv=@(d,aprime,pvprime,a,pv,ks,z1,z2) pv; % a is the current asset holdings
+FnsToEvaluate.ks=@(d,aprime,pvprime,a,pv,ks,z1,z2) ks; % a is the current asset holdings
+FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
+FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.3); % indicator for z=0.3 medical shock
 
 % Now build z_gridvals_J and pi_z_J, setting vfoptions and simoptions flags appropriately
 [z_gridvals_unemp_only_J,pi_z_unemp_only_J,statdist_z1_unemp_only,vfoptions_unemp_only,simoptions_unemp_only]=Setup_QEA(n_z,z2_grid,pi_z2,Params,@(agej,Jr) LifeCycleModel21_ExogShockFn1(agej,Jr),vfoptions,simoptions);

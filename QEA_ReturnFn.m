@@ -1,20 +1,22 @@
-function F=QEA_ReturnFn(h,ks_out,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price)
+function F=QEA_ReturnFn(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price)
 % Is LifeCycleModel8_ReturnFn, but modified to include medical expense
 % shocks when retired.
 
 F=single(-Inf);
 single_0=single(0); single_1=single(1); single_5=single(5);
+h=d;
+ks_out=d;
 
 if agej<Jr
-    if ks_out>single_0 % If working age, no KiwiSaver withdrawals allowed
-        return
-    end
     if aprime<single_0 && pvprime>pv % Can't buy PVs using debt
         return
     end
 else
     % If retired, cannot take on debt
     if aprime<single_0
+        return
+    end
+    if ks_out>0.5
         return
     end
 end
