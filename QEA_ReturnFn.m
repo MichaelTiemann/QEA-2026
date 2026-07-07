@@ -24,7 +24,9 @@ end
 housing=single(398)*kappa_j; % housing scales with income
 utilities=single(80);
 food=single(300);
-transport=single(252);
+% transport=single(252);
+transport_fuel=single(150);
+transport_nonfuel=single(252)-transport_fuel;
 taxes=single_0; % only pay taxes when employed
 discretionary=single(518)*kappa_j; % discretionary scales with income;
 w_factor=single_1/single(2668); % unscaled weekly average gross wages
@@ -51,8 +53,8 @@ if c<single_0 % Early out if cannot meet consumption constraint
 end
 
 % We now compute core living expenses to deduct from consumption; convert kiwi stats to model units
-nongrid_expenses=housing+food+discretionary*employment_factor+taxes;
-grid_budget=utilities+transport*employment_factor;
+nongrid_expenses=housing+food+(transport_nonfuel+discretionary)*employment_factor+taxes;
+grid_budget=utilities+transport_fuel*employment_factor;
 % Calculate energy expense/income/investment
 grid_expenses=grid_budget*(energy_shock*z2+single(~energy_shock));
 if pv>single_5
