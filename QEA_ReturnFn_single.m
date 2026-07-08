@@ -13,7 +13,7 @@ if agej<Jr
     end
 else
     % If retired, cannot take on much debt
-    if aprime+ks+20<single_0
+    if aprime+ks+50<single_0
         return
     end
 end

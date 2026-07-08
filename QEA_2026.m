@@ -58,7 +58,7 @@ Params.psi = 10; % Weight on leisure
 
 % Prices
 Params.w=1; % Wage
-Params.r=0.0; % Interest rate (0.05 is 5%)
+Params.r=0.04; % Interest rate (0.05 is 5%)
 % Note that this include direct costs (utilities, transport fuel) as well as indirect (energy fraction costs of goods and services consumed)
 Params.energy_shock_magnitude=2; % If 1, shock returns to mean; if > 1, shock increases price by (energy_shock-1)
 % Median Kiwi income is roughly $120K/hh, so $20K 5kW system with 10kWh battery is 1/6th income.
@@ -91,7 +91,7 @@ energy_shock_factor=[0,0,1,1];
 energy_shock_factor=0;
 
 pension_schemes=[0.07, 0.15, 0.25];
-pension_schemes=0.0;
+pension_schemes=0.2;
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -130,7 +130,7 @@ vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
 cast2precision=str2func(vfoptions.precision);
 
 zero=cast2precision(0);
-a_grid_debt=1-exp(linspace(log(cast2precision(16)),0,floor(n_a(1)/3)+1));
+a_grid_debt=1-exp(linspace(log(cast2precision(51)),0,floor(n_a(1)/3)+1));
 a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast2precision(-2.5)),0,ceil(2*n_a(1)/3));
 asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
 [~,zero_asset_index]=min(abs(asset_grid));
