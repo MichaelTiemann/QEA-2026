@@ -1,4 +1,4 @@
-function ks_prime=QEA_ksprimeFn(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j)
+function ks_prime=QEA_ksprimeFn_single(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j)
 
 h=d;
 ks_out=d;

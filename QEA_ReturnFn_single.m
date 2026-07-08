@@ -12,11 +12,8 @@ if agej<Jr
         return
     end
 else
-    % If retired, cannot take on debt
-    if aprime<single_0
-        return
-    end
-    if ks_out>0.5
+    % If retired, cannot take on much debt
+    if aprime+ks<single_0
         return
     end
 end
@@ -37,18 +34,21 @@ if agej<Jr % If working age
     taxes=income*single(591)*w_factor; % taxes scale with income
     % Kiwisaver takes 5% out of income
     c=income*(single_1-ks_employee);
-    if a>=single_0
-        % Positive assets pay r interest rate
-        c=c+(single_1+r)*a-aprime;
-    else
-        % Negative assets pay 2*r loan rate
-        c=c+(single_1+2*r)*a-aprime;
-    end
 else % Retirement
     employment_factor=single(0.9); % Retirees less active?
-    c=pension+ks_out*ks+(single_1+r)*a-z1-aprime; % Subtract z1 (medical expenses) here
+    c=pension+ks_out*ks-z1; % Subtract z1 (medical expenses) here
 end
-if c<single_0 % Early out if cannot meet consumption constraint
+if a>=single_0
+    % Positive assets pay r interest rate
+    c=c+(single_1+r)*a-aprime;
+elseif agej==Jr && aprime==single_0
+    % Jubilee !!
+    c=c+single_1;
+else
+    % Negative assets pay 2*r loan rate
+    c=c+(single_1+2*r)*a-aprime;
+end
+if c<=single_0 % Early out if cannot meet minimal consumption constraint
     return
 end
 
@@ -73,7 +73,7 @@ c=c+(grid_income-total_expenses)*w_factor-pv_investment;
 if aprime<0
     if c+aprime>single_0 % No new debt for extra consumption
         return
-    elseif h < single(0.6) % No debt if not trying to hustle
+    elseif agej<Jr && h<single(0.6) % No debt if not trying to hustle
         % Note that if unemployed, one can still offer hours, even if they don't count
         return
     end
@@ -81,12 +81,16 @@ end
 
 if c>0
     F=(c^(single_1-sigma))/(single_1-sigma) -psi*(h^(single_1+eta))/(single_1+eta); % The utility function
+    if aprime<0
+        F=F*1e-3+aprime*1e4; % Trivialize calculated F and Disfavor debt so we used the least of it possible
+    end
 else
     F=(c-single_1)*1e3;
+    if aprime<0
+        F=F+aprime*1e5; % Trivialize calculated F and Disfavor debt so we used the least of it possible
+    end
 end
-if aprime<0
-    F=F*1e-3+aprime*1e4; % Trivialize calculated F and Disfavor debt so we used the least of it possible
-end
+
 
 % add the warm glow to the return, but only near end of life
 if agej-Jr>=10
