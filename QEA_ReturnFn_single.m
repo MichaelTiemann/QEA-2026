@@ -1,4 +1,4 @@
-function F=QEA_ReturnFn(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price)
+function F=QEA_ReturnFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price)
 % Is LifeCycleModel8_ReturnFn, but modified to include medical expense
 % shocks when retired.
 
@@ -13,7 +13,7 @@ if agej<Jr
     end
 else
     % If retired, cannot take on much debt
-    if aprime+ks<single_0
+    if aprime+ks+20<single_0
         return
     end
 end
