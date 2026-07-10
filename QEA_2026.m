@@ -40,8 +40,8 @@ n_d=47; % Endogenous labour choice (fraction of time worked); and kiwisaver rede
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_multiplier=96;
 ks_multiplier=32;
-n_a=[197,1,37]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
-n_z=[2,7]; % Exogenous labor productivity units shock; energy price shocks
+n_a=[197,4,37]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
+n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions.lowmemory=3;
 Params.Q_min=2;
@@ -52,21 +52,21 @@ Params.Q_max=19;
 % Discount rate
 Params.beta = 0.96;
 % Preferences
-Params.sigma = 2; % Coeff of relative risk aversion (curvature of consumption)
-Params.eta = 1.5; % Curvature of leisure (This will end up being 1/Frisch elasticity)
-Params.psi = 10; % Weight on leisure
+Params.sigma = 2.5; % Coeff of relative risk aversion (curvature of consumption); larger=>more precautionary
+Params.eta = 0.5; % Curvature of leisure (This will end up being 1/Frisch elasticity); larger=>less leisure
+Params.psi = 20; % Weight on leisure; larger=>more leisure
 
 % Prices
 Params.w=1; % Wage
-Params.r=0.04; % Interest rate (0.05 is 5%)
+Params.r=0.04071; % Interest rate (0.05 is 5%)
 % Note that this include direct costs (utilities, transport fuel) as well as indirect (energy fraction costs of goods and services consumed)
 Params.energy_shock_magnitude=2; % If 1, shock returns to mean; if > 1, shock increases price by (energy_shock-1)
 % Median Kiwi income is roughly $120K/hh, so $20K 5kW system with 10kWh battery is 1/6th income.
 % One fifth share of that (1kW+2kWh) is 1/30th income.
-Params.pv_share_price=1/6;
+Params.pv_share_price=1/30;
 
 % KiwiSaver Scheme
-Params.ks_r=0.0; % Long-term growth estimate
+Params.ks_r=0.07; % Long-term growth estimate
 Params.ks_employee=0.035; % Employee contribution
 Params.ks_employer=0.035; % Employer contribution
 
@@ -79,7 +79,7 @@ shock_titles={"No Shocks", "Unemployment and Medical", "Energy Only", "All Shock
 shock_titles={"Unemployment and Medical"};
 
 ks_legends={"5% emp only", "3.5% + 3.5%", "5% + 5%"};
-ks_legends={"None"};
+ks_legends={"5% emp only"};
 
 ks_regime_contributions=[[0.05,0]; [0.035, 0.035]; [0.05, 0.05]];
 ks_regime_contributions=[[0.0, 0.0]];
@@ -90,8 +90,8 @@ ExocShockFn_vec={@LifeCycleModel21_ExogShockFn};
 energy_shock_factor=[0,0,1,1];
 energy_shock_factor=0;
 
-pension_schemes=[0.07, 0.15, 0.25];
-pension_schemes=0.2;
+pension_schemes=[0.1, 0.2, 0.3];
+pension_schemes=0.0;
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -136,7 +136,7 @@ asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
 [~,zero_asset_index]=min(abs(asset_grid));
 asset_grid(zero_asset_index)=0;
 
-pv_grid=(0:n_a(2)-1)';
+pv_grid=(2.^(0:n_a(2)-1)-1)';
 
 % ks_grid and a_grid are set below
 
@@ -193,6 +193,9 @@ FnsToEvaluate.ks=@(d,aprime,pvprime,a,pv,ks,z1,z2) ks; % a is the current asset 
 FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
 FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
 
+FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock) QEA_IncomeFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
+FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
+FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,J,kappa_j,wg1,wg2,wg3,beta,sj) QEA_LeisureFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,J,kappa_j,wg1,wg2,wg3,beta,sj);
 
 %% Now compute the 'stationary distribution' of households under various conditions
 % Four shock regimes: none, unemployment and medical, energy, all shocks
@@ -289,6 +292,34 @@ for shock_regime=1:length(shock_titles)
                 hold off
                 title(sprintf("\nLife Cycle Profile: Assets (a)\nParams.rho_z2 = %.3f;\nParams.sigma_epsilon_z2 = %.3f\nKS: %s\nPension = %d", Params.rho_z2, Params.sigma_epsilon_z2, ks_legends{ks_regime}, round(100*pension_schemes(pension_regime))),'Interpreter','none')
                 legend(shock_titles{shock_regime},'Interpreter','none')
+
+                AgeConditionalStats2=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate2,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
+
+                if ishandle(301+ks_regime*2)
+                    clf(301+ks_regime*2)
+                end
+                figure(301+ks_regime*2)
+                hold on
+                plot(1:1:Params.J,AgeConditionalStats2.income.Mean)
+                plot(1:1:Params.J,AgeConditionalStats2.income.QuantileMeans(Params.Q_min,:))
+                plot(1:1:Params.J,AgeConditionalStats2.income.QuantileMeans(Params.Q_max,:))
+                plot(1:1:Params.J,AgeConditionalStats2.expenses.Mean)
+                plot(1:1:Params.J,AgeConditionalStats2.expenses.QuantileMeans(Params.Q_min,:))
+                plot(1:1:Params.J,AgeConditionalStats2.expenses.QuantileMeans(Params.Q_max,:))
+                legend({'income.Mean','income.Q_min','income.Q_max','expense.Mean','expense.Q_min','expense.Q_max'},'Interpreter','none')
+                hold off
+
+                AgeConditionalStats2=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate2,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
+
+                if ishandle(302+ks_regime*2)
+                    clf(302+ks_regime*2)
+                end
+                figure(302+ks_regime*2)
+                hold on
+                plot(1:1:Params.J,AgeConditionalStats2.leisure_h.Mean,'-o')
+                plot(1:1:Params.J,AgeConditionalStats2.leisure_h.Minimum,'-d')
+                plot(1:1:Params.J,AgeConditionalStats2.leisure_h.Maximum,'-p')
+                hold off
             end
         end
     end
@@ -346,8 +377,8 @@ end
 
 ACS_mean_max=gather(max(arrayfun(@(x) max(x.ks.Mean+x.assets.Mean+1), ACSvec)));
 ACS_mean_min=gather(min(arrayfun(@(x) min(x.assets.Mean), ACSvec)));
-ACS_max=gather(max(arrayfun(@(x) max(x.ks.QuantileCutoffs(Params.Q_max,:)+x.assets.QuantileCutoffs(Params.Q_max,:)), ACSvec)));
-ACS_min=gather(min(arrayfun(@(x) min(x.assets.QuantileCutoffs(Params.Q_min,:)), ACSvec)));
+ACS_max=gather(max(arrayfun(@(x) max(x.ks.QuantileMeans(Params.Q_max,:)+x.assets.QuantileMeans(Params.Q_max,:)), ACSvec)));
+ACS_min=gather(min(arrayfun(@(x) min(x.assets.QuantileMeans(Params.Q_min,:)), ACSvec)));
 if isnan(ACS_min)
     ACS_min=ACS_mean_min;
 end
@@ -378,21 +409,22 @@ for ii=1:length(ACSvec)
     title(ACSvec(ii).title,'Interpreter','none')
     legend(ACSvec(ii).legend{:},'Interpreter','none')
     axis([1, length(ACSvec(1).assets.Mean)+1, ACS_min, ACS_mean_max]);
-    if any(ACSvec(ii).assets.QuantileCutoffs(1,:)==asset_grid(1))
+    if any(ACSvec(ii).assets.QuantileMeans(1,:)==asset_grid(1))
         warning(sprintf("assets (Minimum) hit debt floor ACSvec(%d)", ii));
     end
     if any(ACSvec(ii).assets.Mean==asset_grid(1))
         warning(sprintf("!!!!!! assets (Mean) hit debt floor ACSvec(%d) !!!!!!", ii));
     end
-    if any(ACSvec(ii).assets.QuantileCutoffs(end,:)==asset_grid(end))
+    if any(ACSvec(ii).assets.QuantileMeans(end,:)==asset_grid(end))
         warning(sprintf("assets maxed out ACSvec(%d)", ii));
     end
-    if any(ACSvec(ii).pv.QuantileCutoffs(end,:)==pv_grid(end))
+    if any(ACSvec(ii).pv.QuantileMeans(end,:)==pv_grid(end))
         warning(sprintf("pv shares maxed out ACSvec(%d)", ii));
     end
-    if any(ACSvec(ii).ks.QuantileCutoffs(end,:)==ks_grid(end))
+    if any(ACSvec(ii).ks.QuantileMeans(end,:)==ks_grid(end))
         warning(sprintf("ks maxed out ACSvec(%d)", ii));
     end
+    pause(0.1)
 end
 
 end
@@ -428,8 +460,8 @@ function Subplot_ACS_profiles(ACSvec, Params, ii, fieldname)
 hold on
 plot(1:1:Params.J,ACSvec(ii).(fieldname).Mean)
 plot(1:1:Params.J,ACSvec(ii).(fieldname).Minimum)
-plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileCutoffs(Params.Q_min,:))
-plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileCutoffs(Params.Q_max,:))
+plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileMeans(Params.Q_min,:))
+plot(1:1:Params.J,ACSvec(ii).(fieldname).QuantileMeans(Params.Q_max,:))
 plot(1:1:Params.J,ACSvec(ii).(fieldname).Maximum)
 hold off
 
