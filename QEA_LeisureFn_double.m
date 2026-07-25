@@ -6,14 +6,21 @@ double_0=double(0); double_1=double(1);
 h=d;
 ks_out=d;
 
-leisure=double_0;
+discretionary=518*kappa_j; % discretionary scales with income;
+w_factor=double(1/2668); % unscaled weekly average gross wages
+
 if agej<Jr % If working age
-    leisure=(double_1-h)*z1*kappa_j;
+    employment_factor=(z1+double_1)*0.5; % full rate at full employment; half-rate when unemployed
+    leisure=w*(double_1-h)*z1*kappa_j;
 else % Retirement
+    employment_factor=double(0.9); % Retirees less active?
     if aprime>=double_0
-        leisure=((J-agej)/(J-Jr))*(double(0.5)-z1);
+        leisure=ks_out*ks*((J-agej)/(J-Jr))*(double(0.5)-z1);
+    else
+        leisure=double_0;
     end
 end
+leisure=leisure+discretionary*w_factor*employment_factor;
 
 % add the warm glow to the return, but only near end of life, and only with positive net worth
 networth_prime=aprime+ks*(double_1-ks_out);

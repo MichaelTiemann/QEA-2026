@@ -12,6 +12,9 @@ if agej<Jr
         return
     end
 else
+    if ks_out>0.2
+        return
+    end
     % We don't explicitly prohibit debt at retirement
     % Instead, we disfavor it and hope those who don't need it show the way
     % if aprime+ks+50<0
@@ -19,25 +22,34 @@ else
     % end
 end
 
-housing=398*kappa_j; % housing scales with income
+housing=single(398);
 utilities=single(80);
-food=single(300);
+% food=single(300);
+food_fuel=single(75);
+food_nonfuel=single(225);
 % transport=single(252);
 transport_fuel=single(150);
 transport_nonfuel=single(252)-transport_fuel;
 taxes=single_0; % only pay taxes when employed
-discretionary=518*kappa_j; % discretionary scales with income;
+discretionary=single(518);
 w_factor=single(1/2668); % unscaled weekly average gross wages
 
 if agej<Jr % If working age
+    housing=housing*kappa_j; % housing scales with income
+    discretionary=discretionary*kappa_j; % discretionary scales with income
     employment_factor=(z1+single_1)*0.5; % full rate at full employment; half-rate when unemployed
     income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
     taxes=income*591*w_factor; % taxes scale with income
     % Kiwisaver takes 5% out of income
     c=income*(single_1-ks_employee);
 else % Retirement
-    employment_factor=single(0.9); % Retirees less active?
+    employment_factor=single(0.9); % Retirees less active? Live in cheaper houses?
+    housing=housing*employment_factor;
     c=pension+ks_out*ks-z1; % Subtract z1 (medical expenses) here
+    if z1~=0
+        % Focus on getting healthy...no leisure while medically impaired
+        h=single_1;
+    end
 end
 if a>=0
     % Positive assets pay r interest rate
@@ -60,8 +72,8 @@ end
 
 %% All agents in this peel have either debt, income, or assets sufficient to proceed
 % We now compute core living expenses to deduct from consumption; convert kiwi stats to model units
-nongrid_expenses=housing+food+(transport_nonfuel+discretionary)*employment_factor+taxes;
-grid_budget=utilities+transport_fuel*employment_factor;
+nongrid_expenses=housing+food_nonfuel+(transport_nonfuel+discretionary)*employment_factor+taxes;
+grid_budget=utilities+food_fuel+transport_fuel*employment_factor;
 % Calculate energy expense/income/investment
 grid_expenses=grid_budget*(energy_shock*z2+single(~energy_shock));
 if pv>single_5
@@ -89,6 +101,14 @@ if aprime<0
 end
 
 if c>0
+    if agej>=Jr
+        if aprime<0
+            h=single_0;
+        else
+            % Calculate how much we can pretend is real leisure
+            h=c*0.5;
+        end
+    end
     F=(c^(single_1-sigma))/(single_1-sigma) -psi*(h^(single_1+eta))/(single_1+eta); % The utility function
     if aprime<0
         F=F*1e-3+aprime*1e4; % Trivialize calculated F and disfavor debt so we used the least of it possible

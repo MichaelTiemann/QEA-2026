@@ -17,11 +17,14 @@ else
     % if aprime+ks+50<0
     %     return
     % end
+    h=double_0;
 end
 
 housing=398*kappa_j; % housing scales with income
 utilities=double(80);
-food=double(300);
+% food=double(300);
+food_fuel=double(75);
+food_nonfuel=double(225);
 % transport=double(252);
 transport_fuel=double(150);
 transport_nonfuel=double(252)-transport_fuel;
@@ -60,8 +63,8 @@ end
 
 %% All agents in this peel have either debt, income, or assets sufficient to proceed
 % We now compute core living expenses to deduct from consumption; convert kiwi stats to model units
-nongrid_expenses=housing+food+(transport_nonfuel+discretionary)*employment_factor+taxes;
-grid_budget=utilities+transport_fuel*employment_factor;
+nongrid_expenses=housing+food_nonfuel+(transport_nonfuel+discretionary)*employment_factor+taxes;
+grid_budget=utilities+food_fuel+transport_fuel*employment_factor;
 % Calculate energy expense/income/investment
 grid_expenses=grid_budget*(energy_shock*z2+double(~energy_shock));
 if pv>double_5

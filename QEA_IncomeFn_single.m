@@ -21,7 +21,10 @@ else % Retirement
 end
 if a>=single_0
     % Positive assets pay r interest rate
-    income=income+(single_1+r)*a;
+    income=income+r*a;
+    if a>aprime
+        income=income+a-aprime;
+    end
 end
 
 grid_budget=utilities+transport_fuel*employment_factor;
@@ -32,7 +35,7 @@ if pv>single_5
 else
     grid_income=single_0;
 end
-income=(income+grid_income)*w_factor;
+income=income+grid_income*w_factor;
 
 
 end
