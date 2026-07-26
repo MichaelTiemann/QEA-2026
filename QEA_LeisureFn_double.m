@@ -1,4 +1,4 @@
-function leisure=QEA_LeisureFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,J,kappa_j,wg1,wg2,wg3,beta,sj)
+function leisure=QEA_LeisureFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price)
 % Is LifeCycleModel8_ReturnFn, but modified to include medical expense
 % shocks when retired.
 
@@ -6,18 +6,22 @@ double_0=double(0); double_1=double(1);
 h=d;
 ks_out=d;
 
-discretionary=518*kappa_j; % discretionary scales with income;
+discretionary=double(518);
 w_factor=double(1/2668); % unscaled weekly average gross wages
 
+leisure=double_0;
 if agej<Jr % If working age
+    discretionary=discretionary*kappa_j; % discretionary scales with income;
     employment_factor=(z1+double_1)*0.5; % full rate at full employment; half-rate when unemployed
-    leisure=w*(double_1-h)*z1*kappa_j;
+    leisure=w*(double_1-h)*z1*kappa_j*2;
 else % Retirement
     employment_factor=double(0.9); % Retirees less active?
-    if aprime>=double_0
-        leisure=ks_out*ks*((J-agej)/(J-Jr))*(double(0.5)-z1);
-    else
-        leisure=double_0;
+    if aprime>=double_0 && z1==0
+        income=QEA_IncomeFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
+        expenses=QEA_ExpensesFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
+        if income>expenses
+            leisure=0.5*(income-expenses);
+        end
     end
 end
 leisure=leisure+discretionary*w_factor*employment_factor;

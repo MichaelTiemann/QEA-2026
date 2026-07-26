@@ -8,7 +8,7 @@ if agej<Jr % If working age, calculate contributions
     ks_income=w*kappa_j*z1*h;
     ks_prime=ks+ks_growth+ks_income*(ks_employee+ks_employer);
 else % Retirement, redeem ks as needed
-    if ks_out>0.8
+    if ks_out>0.5
         ks_prime=double(-Inf);
     else
         ks_prime=(ks+ks_growth)*(double(1)-ks_out);

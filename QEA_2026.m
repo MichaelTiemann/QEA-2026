@@ -40,7 +40,7 @@ n_d=41; % Endogenous labour choice (fraction of time worked); and kiwisaver rede
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_multiplier=16;
 ks_multiplier=32;
-n_a=[139,5,37]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
+n_a=[139,5,17]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions.lowmemory=1;
@@ -77,25 +77,27 @@ Params.Jr=65-Params.agejshifter;
 % Pensions & Helpers for shock/retirement regimes
 shock_titles={"No Shocks", "Unemployment and Medical", "Energy Only", "All Shocks"};
 % shock_titles={"No Shocks", "Energy Only", "Unemployment and Medical"};
-% shock_titles={"No Shocks"};
+shock_titles={"Unemployment and Medical"};
 
 ks_legends={"5% emp only", "3.5% + 3.5%"};
+ks_legends={"5% emp only (linear grid)", "5% emp only (exp grid)"};
 % ks_legends={"3.5% + 3.5%"};
 
 ks_regime_contributions=[[0.05,0]; [0.035, 0.035]];
+ks_regime_contributions=[[0.05,0]; [0.05,0]];
 % ks_regime_contributions=[[0.035, 0.035]];
 
 ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn,@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn};
-% ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3};
+ExocShockFn_vec={@LifeCycleModel21_ExogShockFn};
 
 energy_shock_factor=[0,0,1,1];
-% energy_shock_factor=[0];
+energy_shock_factor=[0];
 
 pension_schemes=[0.0, 0.15];
-% pension_schemes=0;
+pension_schemes=0.15;
 
 pv_regimes=1:n_a(2);
-pv_regimes=[1 5];
+pv_regimes=[1];
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -156,7 +158,7 @@ vfoptions.aprimeFn=ks_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
 % simoptions.a_grid is set below
-simoptions.optimize_nProbs=1;
+simoptions.optimize_nProbs=0;
 simoptions.verbose=1;
 
 % 1st element: mean
@@ -261,8 +263,11 @@ for shock_regime=1:length(shock_titles)
                 ks_max=ks_balance(end)*ks_multiplier;
                 ks_max=ks_balance(end)+2;
                 % ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
-                ks_grid=linspace(0,ks_max,n_a(3))';
-                % ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max),n_a(3)-1))]';
+                if mod(ks_regime,2)==1
+                    ks_grid=linspace(0,ks_max,n_a(3))';
+                else
+                    ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max),n_a(3)-1))]';
+                end
             end
             [~,zero_ks_index]=min(abs(ks_grid));
             ks_grid(zero_ks_index)=0;

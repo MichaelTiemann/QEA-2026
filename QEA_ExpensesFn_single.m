@@ -5,20 +5,20 @@ function expenses=QEA_ExpensesFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr
 single_0=single(0); single_1=single(1); single_5=single(5);
 h=d;
 
-housing=single(398);
+housing=single(398); % housing scales with income, below
 utilities=single(80);
 food=single(300);
 % transport=single(252);
 transport_fuel=single(150);
 transport_nonfuel=single(252)-transport_fuel;
 taxes=single_0; % only pay taxes when employed
-discretionary=single(518);
+discretionary=single(518)*kappa_j; % discretionary scales with income
 w_factor=single_1/single(2668); % unscaled weekly average gross wages
 
 if agej<Jr % If working age
-    housing=housing*kappa_j; % housing scales with income
-    discretionary=discretionary*kappa_j; % discretionary scales with income;
     employment_factor=(z1+single_1)/single(2); % full rate at full employment; half-rate when unemployed
+    housing=housing*kappa_j; % housing scales with income
+    discretionary=discretionary*kappa_j; % discretionary scales with income
     income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
     taxes=income*591*w_factor; % taxes scale with income
     expenses=single_0;

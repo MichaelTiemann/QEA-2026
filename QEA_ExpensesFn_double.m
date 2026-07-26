@@ -5,28 +5,34 @@ function expenses=QEA_ExpensesFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr
 double_0=double(0); double_1=double(1); double_5=double(5);
 h=d;
 
-housing=double(398)*kappa_j; % housing scales with income
+housing=double(398); % housing scales with income, below
 utilities=double(80);
 food=double(300);
 % transport=double(252);
 transport_fuel=double(150);
 transport_nonfuel=double(252)-transport_fuel;
 taxes=double_0; % only pay taxes when employed
-discretionary=double(518)*kappa_j; % discretionary scales with income;
+discretionary=double(518)*kappa_j; % discretionary scales with income
 w_factor=double_1/double(2668); % unscaled weekly average gross wages
 
 if agej<Jr % If working age
     employment_factor=(z1+double_1)/double(2); % full rate at full employment; half-rate when unemployed
+    housing=housing*kappa_j; % housing scales with income
+    discretionary=discretionary*kappa_j; % discretionary scales with income
     income=w*kappa_j*z1*h; % If unemployed, z1 product will be 0
     taxes=income*591*w_factor; % taxes scale with income
     expenses=double_0;
 else % Retirement
     employment_factor=double(0.9); % Retirees less active?
+    housing=housing*employment_factor;
     expenses=z1; % Subtract z1 (medical expenses) here
 end
 if a<0
     % Negative assets pay 2*r loan rate
     expenses=expenses-(double_1+2*r)*a;
+end
+if aprime>a
+    expenses=expenses-aprime-a;
 end
 
 % We now compute core living expenses to deduct from consumption; convert kiwi stats to model units

@@ -20,9 +20,10 @@ else
     % if aprime+ks+50<0
     %     return
     % end
+    h=single_0;
 end
 
-housing=single(398);
+housing=single(398); % housing scales with income, below
 utilities=single(80);
 % food=single(300);
 food_fuel=single(75);
@@ -31,7 +32,7 @@ food_nonfuel=single(225);
 transport_fuel=single(150);
 transport_nonfuel=single(252)-transport_fuel;
 taxes=single_0; % only pay taxes when employed
-discretionary=single(518);
+discretionary=single(518); % discretionary scales with income, below
 w_factor=single(1/2668); % unscaled weekly average gross wages
 
 if agej<Jr % If working age
