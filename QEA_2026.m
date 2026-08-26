@@ -180,7 +180,7 @@ ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_e
     QEA_ReturnFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 % Octave compatibility layer: this ReturnFn supports direct singleton expansion.
-vfoptions.vectorizedarrayfunnames={'QEA_ReturnFn_single'};
+vfoptions.vectorizedarrayfunnames={'QEA_ReturnFn_single','QEA_ksprimeFn_single','QEA_IncomeFn_single','QEA_ExpensesFn_single','QEA_LeisureFn_single'};
 ncores = 10;
 if exist('ncores', 'var') && ncores>1
     vfi_pool('start', ncores);
@@ -209,14 +209,19 @@ FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa
 FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
 FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) QEA_LeisureFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
+% Create a universal dimension protector that evaluates to an (N_a x N_z) matrix of zeros
+dim_protector = @(a, z1) 0 .* a .* z1;
+
 FnsToEvaluate=FnsToEvaluate2;
-FnsToEvaluate.fractiontimeworked=@(h,aprime,pvprime,a,pv,ks,z1,z2) h; % h is fraction of time worked
-FnsToEvaluate.earnings=@(h,aprime,pvprime,a,pv,ks,z1,z2,w,kappa_j) w*kappa_j*z1*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
-FnsToEvaluate.assets=@(d,aprime,pvprime,a,pv,ks,z1,z2) a; % a is the current asset holdings
-FnsToEvaluate.pv=@(d,aprime,pvprime,a,pv,ks,z1,z2) pv; % a is the current asset holdings
-FnsToEvaluate.ks=@(d,aprime,pvprime,a,pv,ks,z1,z2) ks; % a is the current asset holdings
-FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % indicator for z=0 (unemployment) [Note: only makes sense as unemployment for j=1,..,Jr]
-FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
+% Trivial functions safely expanded to the full state space:
+FnsToEvaluate.fractiontimeworked    = @(h,aprime,pvprime,a,pv,ks,z1,z2) h + dim_protector(a, z1);
+FnsToEvaluate.assets                = @(d,aprime,pvprime,a,pv,ks,z1,z2) a + dim_protector(a, z1);
+FnsToEvaluate.pv                    = @(d,aprime,pvprime,a,pv,ks,z1,z2) pv + dim_protector(a, z1);
+FnsToEvaluate.ks                    = @(d,aprime,pvprime,a,pv,ks,z1,z2) ks + dim_protector(a, z1);
+FnsToEvaluate.fractionunemployed    = @(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0) + dim_protector(a, z1);
+FnsToEvaluate.fractionwithmedicalexpenses = @(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125) + dim_protector(a, z1);
+
+FnsToEvaluate.earnings=@(h,aprime,pvprime,a,pv,ks,z1,z2,w,kappa_j) w*kappa_j.*z1.*h; % w*kappa_j*z*h is the labor earnings (note: h will be zero when z is zero, so could just use w*kappa_j*h)
 
 %% Now compute the 'stationary distribution' of households under various conditions
 % Four shock regimes: none, unemployment and medical, energy, all shocks
