@@ -182,8 +182,10 @@ ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_e
 % Octave compatibility layer: this ReturnFn supports direct singleton expansion.
 vfoptions.vectorizedarrayfunnames={'QEA_ReturnFn_single','QEA_ksprimeFn_single','QEA_IncomeFn_single','QEA_ExpensesFn_single','QEA_LeisureFn_single'};
 ncores = 10;
-if exist('ncores', 'var') && ncores>1
-    vfi_pool('start', ncores);
+if exist('ncores', 'var')
+    if ncores>1
+        vfi_pool('start', ncores);
+    end
     vfoptions.n_proc=ncores;
 end
 vfoptions.verbose=1;

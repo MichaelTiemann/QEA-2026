@@ -84,13 +84,13 @@ end
 
 feasible = (c > 0);
 c_for_utility = c;
-c_for_utility(~feasible) = 1;
+c_for_utility(~feasible) = single_1;
 
 % Pre-compute the division scalars to use BLAS multiplication
-util_scale_c = 1 / (1 - sigma);
-util_scale_h = psi / (1 + eta);
+util_scale_c = single_1 / (single_1 - sigma);
+util_scale_h = psi / (single_1 + eta);
 
-F = (c_for_utility .^ (1 - sigma)) * util_scale_c - (h_util .^ (1 + eta)) * util_scale_h;
+F = (c_for_utility .^ (single_1 - sigma)) * util_scale_c - (h_util .^ (single_1 + eta)) * util_scale_h;
 
 %% Penalties
 debt_mask = (aprime < 0);
@@ -112,8 +112,10 @@ if agej - Jr >= 10
     wg_scalar_multiplier = (wg1 / (single_1 - wg3)) * (beta * (single_1 - sj));
 
     % Replaced division with reciprocal multiplication (* (1/wg2))
-    warmglow = (networth_prime > 0) .* ((single_1 + safe_nw * (1/wg2)) .^ (single_1 - wg3)) * wg_scalar_multiplier;
+    warmglow = (networth_prime > 0) .* ((single_1 + safe_nw * (single_1/wg2)) .^ (single_1 - wg3)) * wg_scalar_multiplier;
 
     F = F + warmglow;
 end
+
+
 end
