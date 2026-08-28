@@ -40,7 +40,7 @@ n_d=41; % Endogenous labour choice (fraction of time worked); and kiwisaver rede
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_multiplier=16;
 ks_multiplier=32;
-n_a=[67,5,37]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
+n_a=[73,5,47]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions=struct();
@@ -307,6 +307,11 @@ for shock_regime=1:length(shock_titles)
                 [V, Policy]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_this_shock);
                 toc
 
+                if exist('ncores', 'var') && ncores>1
+                    vfi_pool('stop', ncores);
+                    vfi_pool('start', ncores);
+                end
+
                 %% Initial distribution of agents at birth (j=1)
                 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
                 jequaloneDist=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
@@ -314,8 +319,19 @@ for shock_regime=1:length(shock_titles)
 
                 StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
 
+                if exist('ncores', 'var') && ncores>1
+                    vfi_pool('stop', ncores);
+                    vfi_pool('start', ncores);
+                end
+
                 %% Calculate the life-cycle profiles for all shocks
                 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
+
+                if exist('ncores', 'var') && ncores>1
+                    vfi_pool('stop', ncores);
+                    vfi_pool('start', ncores);
+                end
+
                 AgeConditionalStats.title=sprintf("Life Cycle Profile: Assets Allocations %s; Pension %d", shock_titles{shock_regime}, round(100*pension_schemes(pension_regime)));
                 AgeConditionalStats.legend={sprintf("KiwiSaver Balance (ks) %s", ks_legends{ks_regime}), ...
                     'Solar PV Shares (pv)', ...
