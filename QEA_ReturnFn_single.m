@@ -41,10 +41,12 @@ else
     employment_factor=single(0.9);
     housing = housing * employment_factor;
 
-    % Optimized scalar multiplications
-    c = pension + ks_out .* ks - z1 - 1e9 * (ks_out > 0.2) + (single_1 + r + r * (a < 0)) .* a - aprime + dim_enforcer;
+    % Optimized scalar multiplications; disfavor large ks_out
+    withdrawal_mask=(ks_out > 0.2) * 1e9;
+    c = pension + ks_out .* ks - z1 - withdrawal_mask + (single_1 + r + r * (a < 0)) .* a - aprime + dim_enforcer;
 
     if agej == Jr
+        % Jubilee that allows debt to be forgiven for low-consumption agents
         c = c + (aprime == 0) * single_1;
     end
 end
@@ -72,7 +74,11 @@ c = c + (grid_income - total_expenses) * w_factor - pv_investment;
 
 % Logical AND (&) is faster than floating-point multiplication (.*)
 bad_debt_mask = (aprime < 0) & ( (c + aprime > 0) | (agej < Jr & labor_h < 0.6) );
+% Bad debt is either debt excess to feasible consumption or debt without sufficient hustle
 c = c - bad_debt_mask * 1e9;
+% Replicates the early 'return' (-Inf) for working-age agents who can't meet minimal consumption
+starvation_mask = (c <= 0) & (agej < Jr);
+c = c - starvation_mask * 1e9;
 
 %% Utility Calculation
 if agej < Jr
@@ -99,8 +105,11 @@ infeas_mask = ~feasible;
 infeas_debt_mask = infeas_mask & debt_mask;
 
 % Stripped unnecessary dots for scalar penalties
+% Feasible: Trivialize calculated F and disfavor debt so we used the least of it possible
 F = F + feas_debt_mask .* (F * (1e-3 - single_1) + aprime * 1e4);
+% Infeasible: Disfavor a technically infeasible solution...
 F = F + infeas_mask .* ((c - single_1) * 1e3 - F);
+% ...and Augment disfavored F and further disfavor debt so we used the least of it possible
 F = F + infeas_debt_mask .* (aprime * 1e5);
 
 %% Warm Glow
