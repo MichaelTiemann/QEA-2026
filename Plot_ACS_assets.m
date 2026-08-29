@@ -4,7 +4,7 @@ if ~exist("fig_start", "var")
     fig_start=10;
 end
 
-ACS_mean_max=gather(max(arrayfun(@(x) max(x.ks.Mean+x.assets.Mean+x.leisure_h.Mean+1), ACSvec)));
+ACS_mean_max=gather(max(arrayfun(@(x) max(x.ks.Mean+x.assets.Mean+x.leisure_h.Mean+4), ACSvec)));
 ACS_mean_min=gather(min(arrayfun(@(x) min(x.assets.Mean), ACSvec)));
 ACS_max=gather(max(arrayfun(@(x) max(x.ks.QuantileMeans(Params.Q_max,:)+x.assets.QuantileMeans(Params.Q_max,:)+x.leisure_h.QuantileMeans(Params.Q_max,:)), ACSvec)));
 ACS_min=gather(min(arrayfun(@(x) min(x.assets.QuantileMeans(Params.Q_min,:)), ACSvec)));
@@ -44,9 +44,15 @@ for ii=1:length(ACSvec)
     end
     figure(fig_start+ii)
     title(ACSvec(ii).title,'Interpreter','none')
-    area(1:1:Params.J, [ACSvec(ii).ks.Mean; ACSvec(ii).pv.Mean*Params.pv_share_price; ACSvec(ii).assets.Mean; ACSvec(ii).leisure_h.Mean]', y_min);
-    legend(ACSvec(ii).legend{:},'Interpreter','none')
-    axis([1, length(ACSvec(1).assets.Mean)+1, ACS_min, ACS_mean_max]);
+    area(1:1:Params.J,
+         [(ACSvec(ii).assets.Mean<0).*ACSvec(ii).assets.Mean;
+          ACSvec(ii).ks.Mean;
+          ACSvec(ii).pv.Mean*Params.pv_share_price;
+          (ACSvec(ii).assets.Mean>=0).*ACSvec(ii).assets.Mean;
+          ACSvec(ii).leisure_h.Mean]',
+         y_min);
+    legend('Debt drawdown', ACSvec(ii).legend{:},'Interpreter','none')
+    axis([1, length(ACSvec(1).assets.Mean)+1, ACS_mean_min, ACS_mean_max]);
     if any(ACSvec(ii).assets.QuantileMeans(1,:)==asset_grid(1))
         warning(sprintf("assets (Minimum) hit debt floor ACSvec(%d)", ii));
     end
@@ -62,7 +68,7 @@ for ii=1:length(ACSvec)
     if any(ACSvec(ii).ks.QuantileMeans(end,:)==ks_grid(end))
         warning(sprintf("ks maxed out ACSvec(%d)", ii));
     end
-    pause(0.1)
+    pause(0.05)
 end
 
 end
