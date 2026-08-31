@@ -45,6 +45,7 @@ n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
 vfoptions=struct();
 vfoptions.lowmemory=0;
+vfoptions.ram_dir='/Volumes/VFIRAM';
 Params.Q_min=1;
 Params.Q_max=20;
 
@@ -98,7 +99,7 @@ pension_schemes=[0.0, 0.15];
 pension_schemes=0.15;
 
 pv_regimes=1:n_a(2);
-pv_regimes=[1,n_a(2)];
+pv_regimes=[n_a(2),1];
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -136,11 +137,10 @@ AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mas
 %% Grids (except Z, which is case-by-case below)
 simoptions=struct();
 vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
-cast2precision=str2func(vfoptions.precision);
 
-zero=cast2precision(0);
-a_grid_debt=1-exp(linspace(log(cast2precision(51)),0,floor(n_a(1)/3)+1));
-a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast2precision(-2.5)),0,ceil(2*n_a(1)/3));
+zero=cast(0,vfoptions.precision);
+a_grid_debt=1-exp(linspace(log(cast(51,vfoptions.precision)),0,floor(n_a(1)/3)+1));
+a_grid_exp=exp(linspace(cast(-2.5,vfoptions.precision),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast(-2.5,vfoptions.precision)),0,ceil(2*n_a(1)/3));
 asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
 [~,zero_asset_index]=min(abs(asset_grid));
 asset_grid(zero_asset_index)=0;
@@ -184,7 +184,7 @@ vfoptions.vectorizedarrayfunnames={'QEA_ReturnFn_single','QEA_ksprimeFn_single',
 ncores = 10;
 if exist('ncores', 'var')
     if ncores>1
-        vfi_pool('start', ncores);
+        vfi_pool('start', ncores, vfoptions.ram_dir);
     end
     vfoptions.n_proc=ncores;
 end
@@ -279,11 +279,11 @@ for shock_regime=1:length(shock_titles)
                 ks_balance=[ks_balance, ks_balance(end)+cumsum(ks_balance(end).*((1+Params.ks_r-0.03).^(Params.J-Params.Jr:-1:1)-1))];
                 ks_max=ks_balance(end)*ks_multiplier;
                 ks_max=ks_balance(end)+2;
-                % ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
+                % ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
                 if mod(ks_regime,2)==1
                     ks_grid=linspace(0,ks_max,n_a(3))';
                 else
-                    ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max),n_a(3)-1))]';
+                    ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max),n_a(3)-1))]';
                 end
             end
             [~,zero_ks_index]=min(abs(ks_grid));
@@ -308,7 +308,7 @@ for shock_regime=1:length(shock_titles)
                 toc
 
                 if exist('ncores', 'var') && ncores>1
-                    vfi_pool('restart', ncores);
+                    vfi_pool('restart', ncores, vfoptions.ram_dir);
                 end
 
                 %% Initial distribution of agents at birth (j=1)
@@ -318,15 +318,11 @@ for shock_regime=1:length(shock_titles)
 
                 StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
 
-                if exist('ncores', 'var') && ncores>1
-                    vfi_pool('restart', ncores);
-                end
-
                 %% Calculate the life-cycle profiles for all shocks
                 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
 
                 if exist('ncores', 'var') && ncores>1
-                    vfi_pool('restart', ncores);
+                    vfi_pool('restart', ncores, vfoptions.ram_dir);
                 end
 
                 AgeConditionalStats.title=sprintf("Life Cycle Profile: Assets Allocations %s; Pension %d", shock_titles{shock_regime}, round(100*pension_schemes(pension_regime)));
@@ -390,7 +386,7 @@ for shock_regime=1:length(shock_titles)
 end
 
 if exist('ncores', 'var')
-    vfi_pool('stop', ncores);
+    vfi_pool('stop', ncores, vfoptions.ram_dir);
 end
 
 %% Plot the results

@@ -22,6 +22,7 @@ if exist('vfoptions','var')==0
     vfoptions.n_ambiguity=0;
     vfoptions.n_e=0;
     vfoptions.n_semiz=0;
+    vfoptions.n_proc=1;
 else
     if ~isfield(vfoptions,'dynasty')
         vfoptions.dynasty=0;
@@ -56,7 +57,12 @@ else
     if ~isfield(vfoptions,'n_semiz')
         vfoptions.n_semiz=0;
     end
+    if ~isfield(vfoptions,'n_proc')
+        vfoptions.n_proc=1;
+    end
 end
+
+ncores = vfoptions.n_proc;
 
 %% Deal with Experience Asset if need to do that
 % experienceasset: aprime(d,a)
@@ -90,7 +96,7 @@ if vfoptions.experienceasset>=1 || vfoptions.experienceassetu>=1 || vfoptions.ex
             vfoptions.l_dexperienceassetze=1; % by default, only one decision variable influences the experienceassetze
         end
     end
-    
+
     if vfoptions.experienceasset>=1
         vfoptions.l_d2=vfoptions.l_dexperienceasset;
         vfoptions.l_a2=vfoptions.experienceasset;
@@ -150,20 +156,20 @@ if vfoptions.experienceasset>=1 || vfoptions.experienceassetu>=1 || vfoptions.ex
 
     lowmem_aprimefn=nan;
     if vfoptions.experienceasset>=1
-        lowmem_aprimefn=calculate_lowmem_aprime_raw(n_d2, n_a2);
+        lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, n_d2, n_a2);
     elseif vfoptions.experienceassetu>=1
-        lowmem_aprimefn=calculate_lowmem_aprime_raw(n_d2, n_a2, [], [], vfoptions.n_u);
+        lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, n_d2, n_a2, [], [], vfoptions.n_u);
     elseif vfoptions.experienceassete>=1
-        lowmem_aprimefn=calculate_lowmem_aprime_raw(n_d2, n_a2, [], vfoptions.n_e);
+        lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, n_d2, n_a2, [], vfoptions.n_e);
     elseif vfoptions.experienceassetz>=1
-        lowmem_aprimefn=calculate_lowmem_aprime_raw(n_d2, n_a2, n_z);
+        lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, n_d2, n_a2, n_z);
     elseif vfoptions.experienceassetze>=1
-        lowmem_aprimefn=calculate_lowmem_aprime_raw(n_d2, n_a2, n_z, vfoptions.n_e);
+        lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, n_d2, n_a2, n_z, vfoptions.n_e);
     end
     if isnan(lowmem_aprimefn)
         assert(false);
     else
-        lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d2],n_a1,n_a2,vfoptions.n_semiz,n_z,vfoptions.n_e);
+        lowmem_returnfn=calculate_lowmem_raw(ncores, [n_d1,n_d2],n_a1,n_a2,vfoptions.n_semiz,n_z,vfoptions.n_e);
     end
     lowmem=max(lowmem_aprimefn,lowmem_returnfn);
 elseif vfoptions.riskyasset>=1
@@ -187,7 +193,7 @@ elseif vfoptions.riskyasset>=1
     if any(vfoptions.refine_d(2:3)==0)
         error('vfoptions.refine_d cannot contain zeros for d2 or d3 (you can do no d1, but you cannot do no d2 nor no d3)')
     end
-    
+
     if vfoptions.refine_d(1)>0
         n_d1=n_d(1:vfoptions.refine_d(1));
     else
@@ -208,8 +214,8 @@ elseif vfoptions.riskyasset>=1
     else
         n_d4=0;
     end
-    lowmem_aprimefn=calculate_lowmem_aprime_raw([n_d2,n_d3,n_a1],n_a2,vfoptions.n_u);
-    lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d3,n_d4],n_a1,n_a2,n_z,vfoptions.n_semiz,vfoptions.n_e);
+    lowmem_aprimefn=calculate_lowmem_aprime_raw(ncores, [n_d2,n_d3,n_a1],n_a2,vfoptions.n_u);
+    lowmem_returnfn=calculate_lowmem_raw(ncores, [n_d1,n_d3,n_d4],n_a1,n_a2,n_z,vfoptions.n_semiz,vfoptions.n_e);
     lowmem=max(lowmem_aprimefn,lowmem_returnfn);
 elseif vfoptions.residualasset
     if isscalar(n_a)
@@ -219,10 +225,10 @@ elseif vfoptions.residualasset
     end
     n_r=n_a(end); % n_a2 is the residual asset
     rprimefn_lowmem=calculate_lowmem_aprimefn_raw([n_d,n_a1],n_r,[],n_z,vfoptions.n_e);
-    lowmem_returnfn=calculate_lowmem_raw(n_d,n_a1,n_r,[],[n_z,vfoptions.n_e]);
+    lowmem_returnfn=calculate_lowmem_raw(ncores, n_d,n_a1,n_r,[],[n_z,vfoptions.n_e]);
     lowmem=max(rprimefn_lowmem,lowmem_returnfn);
 elseif isfield(vfoptions,'StateDependentVariables_z')==1 || vfoptions.dynasty==1
-    lowmem=calculate_lowmem_raw(n_d,n_a,[],[],n_z,[]);
+    lowmem=calculate_lowmem_raw(ncores, n_d,n_a,[],[],n_z,[]);
 elseif prod(vfoptions.n_semiz)>0
     if length(n_d)>vfoptions.l_dsemiz
         n_d1=n_d(1:end-vfoptions.l_dsemiz);
@@ -231,9 +237,9 @@ elseif prod(vfoptions.n_semiz)>0
     end
     n_d2=n_d(end-vfoptions.l_dsemiz+1:end); % n_d2 is the decision variable that influences the transition probabilities of the semi-exogenous state
 
-    lowmem=calculate_lowmem_raw(n_d, n_a, [], vfoptions.n_semiz,n_z,vfoptions.n_e);
+    lowmem=calculate_lowmem_raw(ncores, n_d, n_a, [], vfoptions.n_semiz,n_z,vfoptions.n_e);
 else
-    lowmem=calculate_lowmem_raw(n_d, n_a, [], [], n_z, vfoptions.n_e);
+    lowmem=calculate_lowmem_raw(ncores, n_d, n_a, [], [], n_z, vfoptions.n_e);
 end
 
 
@@ -243,7 +249,7 @@ end
 
 
 %% Calculate lowmem values for simple grids
-function lowmem = calculate_lowmem_raw(n_d, n_a1, n_a2, n_semiz, n_z, n_e)
+function lowmem = calculate_lowmem_raw(ncores, n_d, n_a1, n_a2, n_semiz, n_z, n_e)
 
 if n_d==0
     n_d=1;
@@ -260,14 +266,31 @@ N_a2=prod(n_a2(n_a2~=0));
 N_semiz=prod(~isempty(n_semiz)*n_semiz);
 N_z=prod(~isempty(n_z)*n_z);
 N_e=prod(~isempty(n_e)*n_e);
-n_semizze=[N_semiz; N_z; N_e];
+n_semizze=[N_semiz; N_z; N_e; 1];
 n_semizze=n_semizze(n_semizze~=0);
+
+ncores_a2=1;
+ncores_z=1;
+ncores_e=1;
+if ncores>1
+    if N_a2 > prod(n_semizze) && ncores >= N_a2
+        ncores_a2 = N_a2;
+        ncores = ncores - ncores_a2;
+    elseif N_z >= N_e && ncores >= N_z
+       ncores_z = N_z;
+       ncores = ncores - ncores_z;
+    elseif ncores >= N_e
+       ncores_e = N_e;
+       ncores = ncores - ncores_e;
+    end
+    ncores=max(ncores,1);
+end
 
 numel_lowmem5=N_d*N_a1*N_a1;
 if numel_lowmem5 < 2^31
-    numel_lowmem4=numel_lowmem5*N_a2;
+    numel_lowmem4=numel_lowmem5*ceil(N_a2/ncores_a2);
     if numel_lowmem4 < 2^31
-        numel_lowmem3=numel_lowmem4*prod(n_semizze);
+        numel_lowmem3=numel_lowmem4*ceil(prod(n_semizze)/ncores_z);
         if numel_lowmem3 < 2^31
             lowmem=0; % we can vectorize everything
         else
@@ -276,7 +299,7 @@ if numel_lowmem5 < 2^31
                     lowmem=1;
                 case 2
                     if N_e
-                        if numel_lowmem4*max(N_semiz,N_z) < 2^31
+                        if numel_lowmem4*max(N_semiz,ceil(N_z/ncores_z)) < 2^31
                             lowmem=1;
                         else
                             lowmem=2;
@@ -287,7 +310,7 @@ if numel_lowmem5 < 2^31
                         lowmem=2;
                     end
                 case 3
-                    if numel_lowmem4*N_semiz*N_z < 2^31
+                    if numel_lowmem4*N_semiz*ceil(N_z/ncores_z) < 2^31
                         lowmem=1;
                     elseif numel_lowmem4*N_semiz < 2^31
                         lowmem=2;
@@ -314,7 +337,7 @@ end
 
 
 %% Calculate lowmem values for simple grids
-function lowmem = calculate_lowmem_aprime_raw(n_d2, n_a2, n_z, n_e, n_u)
+function lowmem = calculate_lowmem_aprime_raw(ncores, n_d2, n_a2, n_z, n_e, n_u)
 
 N_d2=prod(n_d2);
 N_a2=prod(n_a2);
@@ -334,7 +357,24 @@ else
     N_u=0;
 end
 
-numel_lowmem3=N_d2*N_a2;
+ncores_a2=1;
+ncores_z=1;
+ncores_e=1;
+if ncores>1
+    if N_a2 > min(N_z,1)*min(N_e,1) && ncores >= N_a2
+        ncores_a2 = N_a2;
+        ncores = ncores - ncores_a2;
+    elseif N_z >= N_e && ncores >= N_z
+       ncores_z = N_z;
+       ncores = ncores - ncores_z;
+    elseif ncores >= N_e
+       ncores_e = N_e;
+       ncores = ncores - ncores_e;
+    end
+    ncores=max(ncores,1);
+end
+
+numel_lowmem3=N_d2*ceil(N_a2/ncores_a2);
 if numel_lowmem3 < 2^31
     if N_u
         if numel_lowmem3*N_u < 2^31
@@ -344,20 +384,20 @@ if numel_lowmem3 < 2^31
         end
     elseif N_z
         if N_e
-            if numel_lowmem3*N_z*N_e < 2^31
+            if numel_lowmem3*ceil(N_z*N_e/(ncores_z*ncores_e)) < 2^31
                 lowmem=0;
-            elseif numel_lowmem3*N_z < 2^31
+            elseif numel_lowmem3*ceil(N_e/ncores_e) < 2^31
                 lowmem=1;
             else
                 lowmem=2;
             end
-        elseif numel_lowmem3*N_z < 2^31
+        elseif numel_lowmem3*ceil(N_z/ncores_z) < 2^31
             lowmem=0;
         else
             lowmem=1;
         end
     elseif N_e
-        if numel_lowmem3*N_e < 2^31
+        if numel_lowmem3*ceil(N_e/ncores_e) < 2^31
             lowmem=0;
         else
             lowmem=1;
@@ -369,6 +409,7 @@ if numel_lowmem3 < 2^31
 else
     error("Model size exceeds GPU maximum variable size for aprime");
 end
+
 
 end
 
