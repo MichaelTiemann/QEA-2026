@@ -149,15 +149,6 @@ pv_grid=(2.^(0:n_a(2)-1)-1)';
 % Grid for labour choice when agej<Jr; Grid for kiwisaver liquidation otherwise
 d_grid=linspace(zero,1,n_d)'; % Notice that it is imposing the 0<=d<=1 condition implicitly
 
-% Horrible kludge we will remove in the process of triangulation
-% Explicitly declare parameters to bypass auto-detection miscounts for Experience Assets
-vfoptions.ReturnFnParamNames = {'w', 'sigma', 'psi', 'eta', 'agej', 'Jr', 'pension', ...
-    'r', 'ks_employee', 'kappa_j', 'wg1', 'wg2', 'wg3', 'beta', 'sj', ...
-    'energy_shock', 'pv_share_price'};
-
-vfoptions.aprimeFnParamNames = {'w', 'agej', 'Jr', 'ks_r', 'ks_employee', ...
-    'ks_employer', 'kappa_j'};
-
 %% Define aprime function for KiwiSaver
 % By saying nothing about vfoptions.l_dexperienceasset or vfoptions.l_d2, it defaults to 1
 % Ditto vfoptions.l_a2
@@ -304,7 +295,7 @@ for shock_regime=1:length(shock_titles)
                 StationaryDist=StationaryDist_VFHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
         
                 %% Calculate the life-cycle profiles for all shocks
-                AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
+                AgeConditionalStats=LifeCycleProfiles_VFHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
                 AgeConditionalStats.title=sprintf("Life Cycle Profile: Assets Allocations %s; Pension %d", shock_titles{shock_regime}, round(100*pension_schemes(pension_regime)));
                 AgeConditionalStats.legend={sprintf("KiwiSaver Balance (ks) %s", ks_legends{ks_regime}), ...
                     'Solar PV Shares (pv)', ...
