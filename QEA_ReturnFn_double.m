@@ -17,9 +17,6 @@ else
     end
     % We don't explicitly prohibit debt at retirement
     % Instead, we disfavor it and hope those who don't need it show the way
-    % if aprime+ks+50<0
-    %     return
-    % end
     h=double_0;
 end
 
@@ -52,6 +49,7 @@ else % Retirement
         h=double_1;
     end
 end
+
 if a>=0
     % Positive assets pay r interest rate
     c=c+(double_1+r)*a-aprime;
@@ -62,19 +60,12 @@ else
     % Negative assets pay 2*r loan rate
     c=c+(double_1+2*r)*a-aprime;
 end
-if c<=0 && agej<Jr % Early out if cannot meet minimal consumption constraint
-    % When unemployed and without debt, c==0 is possible
-    % By prohibiting c==0, we force the unemployed to take on debt
-    % If this leads to overall infeasibility for one agent, all are affected
-    % If c<0 for all labor/debt choices of any agent at this point, we quit
-    return
-end
-
 
 %% All agents in this peel have either debt, income, or assets sufficient to proceed
 % We now compute core living expenses to deduct from consumption; convert kiwi stats to model units
 nongrid_expenses=housing+food_nonfuel+(transport_nonfuel+discretionary)*employment_factor+taxes;
 grid_budget=utilities+food_fuel+transport_fuel*employment_factor;
+
 % Calculate energy expense/income/investment
 grid_expenses=grid_budget*(energy_shock*z2+double(~energy_shock));
 if pv>double_5
@@ -90,6 +81,7 @@ pv_investment=w*(pvprime-pv)*pv_share_price;
 c=c+(grid_income-total_expenses)*w_factor-pv_investment;
 % Should leave about $529/week for further consumption/investment
 
+% --- Illegal Moves (Aggressive -Inf) ---
 if aprime<0
     if c+aprime>0 % No new debt for extra consumption
         % There is a less negative aprime that should suffice
@@ -101,6 +93,13 @@ if aprime<0
     end
 end
 
+% NEW: Close the Welfare Fraud Loophole
+if (c <= 0) && (aprime > 0 || pvprime > pv)
+    % You cannot claim welfare/bankruptcy while voluntarily increasing your savings or buying solar panels!
+    return
+end
+
+% --- Final Utility & The Social Safety Net ---
 if c>0
     if agej>=Jr
         if aprime<0
@@ -115,18 +114,24 @@ if c>0
         F=F*1e-3+aprime*1e4; % Trivialize calculated F and disfavor debt so we used the least of it possible
     end
 else
-    % Disfavor a technically infeasible solution.
-    % If there is a c>0 for all agents within this peel, it will be selected instead
-    % If not, this disfavored result will be probability-weighted with
-    % other results (some of which may achieve c>0)
-    % If we are at the bitter end of bad luck, our small probability will
-    % not weigh much against the successful mainstream agent population
-    F=(c-double_1)*1e3;
+    % The Bankruptcy Zone: Apply the workfare consumption floor
+    c_min_base = double(0.05); % Baseline survival consumption
+
+    if agej < Jr
+        % Working Age: Mimic OLG-Electrify work-contingent benefit
+        c_welfare = c_min_base + double(0.1) * h;
+    else
+        % Retirement: Flat survival pension
+        c_welfare = c_min_base;
+    end
+
+    % Standard utility of welfare consumption, minus labor disutility, minus stigma
+    F = (c_welfare^(double_1-sigma))/(double_1-sigma) - psi*(h^(double_1+eta))/(double_1+eta) - double(50);
+    
     if aprime<0
-        F=F+aprime*1e5; % Augment disfavored F and further disfavor debt so we used the least of it possible
+        F = F + aprime * 1e5; % Heavily penalize trying to borrow while on welfare
     end
 end
-
 
 % add the warm glow to the return, but only near end of life, and only with positive net worth
 networth_prime=aprime+ks*(double_1-ks_out);

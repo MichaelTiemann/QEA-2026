@@ -85,11 +85,6 @@ else
     c = c + (1 + 2*r) * a - aprime;
 end
 
-if (agej < Jr) && (c <= 0)
-    f_val = -Inf;
-    return;
-end
-
 % --- 3. Core Living Expenses ---
 nongrid_expenses = housing + food_nonfuel + (transport_nonfuel + discretionary) * employment_factor + taxes;
 grid_budget = utilities + food_fuel + transport_fuel * employment_factor;
@@ -112,51 +107,66 @@ total_expenses = nongrid_expenses + grid_expenses;
 pv_investment = w * (pvprime - pv) * pv_share_price;
 c = c + (grid_income - total_expenses) * w_factor - pv_investment;
 
-% --- 4. Debt Restrictions ---
-if (aprime < 0) && (c + aprime > 0)
-    f_val = -Inf;
-    return;
-end
-if (agej < Jr) && (aprime < 0) && (c + aprime <= 0) && (h < 0.6)
-    f_val = -Inf;
-    return;
-end
-
-% --- 5. Utility Evaluation ---
-if agej >= Jr
-    if (c > 0) && (aprime < 0)
-        h = 0;
-    elseif (c > 0) && (aprime >= 0)
-        h = c * 0.5;
+% --- 4. Illegal Moves (Aggressive -Inf) ---
+if aprime < 0
+    if c + aprime > 0 % No new debt for extra consumption
+        f_val = -Inf;
+        return;
+    elseif agej < Jr && h < 0.6 % No debt if not trying to hustle
+        f_val = -Inf;
+        return;
     end
 end
+% Close the Welfare Fraud Loophole ---
+if (c <= 0) && (aprime > 0 || pvprime > pv)
+    % You cannot claim welfare/bankruptcy while voluntarily increasing your savings or buying solar panels!
+    f_val = -Inf;
+    return;
+end
 
+% --- 5. Final Utility & The Social Safety Net ---
 if c > 0
-    % Using arrayfun allows standard conditional branching!
-    % We don't have to evaluate fractional powers of negatives.
+    % Normal Economy
+    if agej >= Jr
+        if aprime < 0
+            h = 0;
+        else
+            h = c * 0.5; % Pretend leisure
+        end
+    end
+
     u_val = (c^(1 - sigma)) / (1 - sigma) - psi * (h^(1 + eta)) / (1 + eta);
+
     if aprime < 0
-        u_val = u_val * 1e-3 + aprime * 1e4;
+        u_val = u_val * 1e-3 + aprime * 1e4; % Disfavor debt usage
     end
-    f_val = u_val;
 else
-    % Agents must still suffer the disutility of labor when in debt!
-    u_val = (c - 1) * 1e3 - psi * (h^(1 + eta)) / (1 + eta);
-    
+    % The Bankruptcy Zone: Apply the workfare consumption floor
+    c_min_base = 0.05; % Baseline survival consumption
+
+    if agej < Jr
+        % Working Age: Mimic OLG-Electrify work-contingent benefit
+        c_welfare = c_min_base + 0.1 * h;
+    else
+        % Retirement: Flat survival pension
+        c_welfare = c_min_base;
+    end
+
+    % Standard utility of welfare consumption, minus labor disutility, minus stigma
+    u_val = (c_welfare^(1 - sigma)) / (1 - sigma) - psi * (h^(1 + eta)) / (1 + eta) - 50;
+
     if aprime < 0
-        u_val = u_val + aprime * 1e5;
-    end
-    f_val = u_val;
-end
-
-% --- 6. Warm Glow of Bequests ---
-if (agej - Jr) >= 10
-    networth_prime = aprime + ks * (1 - ks_out);
-    if networth_prime > 0
-        warmglow = wg1 * ((1 + networth_prime / wg2)^(1 - wg3)) / (1 - wg3);
-        f_val = f_val + beta * (1 - sj) * warmglow;
+        u_val = u_val + aprime * 1e5; % Heavily penalize trying to borrow while on welfare
     end
 end
 
+% --- 6. Warm Glow ---
+networth_prime = aprime + ks * (1 - ks_out);
+if agej - Jr >= 10 && networth_prime > 0
+    warmglow = wg1 * ((1 + networth_prime / wg2)^(1 - wg3)) / (1 - wg3);
+    warmglow = beta * (1 - sj) * warmglow;
+    u_val = u_val + warmglow;
+end
 
+f_val = u_val;
 end
