@@ -162,7 +162,7 @@ vfoptions.aprimeFnParamNames = {'w', 'agej', 'Jr', 'ks_r', 'ks_employee', ...
 %% Define aprime function for KiwiSaver
 % By saying nothing about vfoptions.l_dexperienceasset or vfoptions.l_d2, it defaults to 1
 % Ditto vfoptions.l_a2
-ksV_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEAV_ksprimeFn(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ksV_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEAV_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ksV_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
@@ -184,7 +184,7 @@ DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
 ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
-    QEAV_ReturnFn(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+    QEAV_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 
 %% Compute Z grids (z_gridvals_J and pi_z_J) manually
