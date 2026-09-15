@@ -140,7 +140,9 @@ if c > 0
     end
     f_val = u_val;
 else
-    u_val = (c - 1) * 1e3;
+    % Agents must still suffer the disutility of labor when in debt!
+    u_val = (c - 1) * 1e3 - psi * (h^(1 + eta)) / (1 + eta);
+    
     if aprime < 0
         u_val = u_val + aprime * 1e5;
     end
