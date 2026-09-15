@@ -23,8 +23,8 @@
 %% Begin setting up to use VFI Toolkit to solve
 % Lets model agents from age 20 to age 100, so 81 periods
 
-Params.agejshifter=29; % Age 20 minus one. Makes keeping track of actual age easy in terms of model age
-Params.J=80-Params.agejshifter; % =81, Number of period in life-cycle
+Params.agejshifter=19; % Age 20 minus one. Makes keeping track of actual age easy in terms of model age
+Params.J=100-Params.agejshifter; % =81, Number of period in life-cycle
 
 % Grid sizes to use
 n_d=41; % Endogenous labour choice (fraction of time worked); and kiwisaver redemption percentage
@@ -40,10 +40,11 @@ n_d=41; % Endogenous labour choice (fraction of time worked); and kiwisaver rede
 % ks=13 marginal for 4096x ks_max, a_max @ 4096
 a_multiplier=16;
 ks_multiplier=32;
-n_a=[139,5,17]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
+% n_a=[139,5,79]; % Endogenous asset holdings: assets, pv, kiwisaver; 83 is a good minimum for accurate asset tracking
+
 n_z=[2,5]; % Exogenous labor productivity units shock; energy price shocks
 N_j=Params.J; % Number of periods in finite horizon
-vfoptions.lowmemory=1;
+vfoptions.lowmemory=0;
 Params.Q_min=1;
 Params.Q_max=20;
 
@@ -96,7 +97,7 @@ energy_shock_factor=[0];
 pension_schemes=[0.0, 0.15];
 pension_schemes=0.15;
 
-pv_regimes=1:n_a(2);
+% pv_regimes=1:n_a(2);
 pv_regimes=[1];
 
 % Age-dependent labor productivity units
@@ -133,12 +134,11 @@ Params.mewj=Params.mewj./sum(Params.mewj); % Normalize to one
 AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mass of agents of each age
 
 %% Grids (except Z, which is case-by-case below)
-vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
-cast2precision=str2func(vfoptions.precision);
+vfoptions.precision='double'; simoptions.precision=vfoptions.precision;
 
-zero=cast2precision(0);
-a_grid_debt=1-exp(linspace(log(cast2precision(51)),0,floor(n_a(1)/3)+1));
-a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast2precision(-2.5)),0,ceil(2*n_a(1)/3));
+zero=cast(0,vfoptions.precision);
+a_grid_debt=1-exp(linspace(log(cast(51,vfoptions.precision)),0,floor(n_a(1)/3)+1));
+a_grid_exp=exp(linspace(cast(-2.5,vfoptions.precision),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast(-2.5,vfoptions.precision)),0,ceil(2*n_a(1)/3));
 asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
 [~,zero_asset_index]=min(abs(asset_grid));
 asset_grid(zero_asset_index)=0;
@@ -153,12 +153,12 @@ d_grid=linspace(zero,1,n_d)'; % Notice that it is imposing the 0<=d<=1 condition
 %% Define aprime function for KiwiSaver
 % By saying nothing about vfoptions.l_dexperienceasset or vfoptions.l_d2, it defaults to 1
 % Ditto vfoptions.l_a2
-ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn_single(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ks_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
 % simoptions.a_grid is set below
-simoptions.optimize_nProbs=0;
+simoptions.optimize_nProbs=1;
 simoptions.verbose=1;
 
 % 1st element: mean
@@ -175,7 +175,7 @@ DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
 ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
-    QEA_ReturnFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+    QEA_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 
 %% Compute Z grids (z_gridvals_J and pi_z_J) manually
@@ -195,9 +195,9 @@ z2_grid=z2_grid./mean_z2; % Normalise the grid on z2 (so that the mean of z2 is 
 % FnsToEvaluate are how we say what we want to graph the life-cycles of
 % Like with return function, we have to include (generically, d,aprime,a,z) as first inputs, then just any relevant parameters.
 
-FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock) QEA_IncomeFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
-FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
-FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) QEA_LeisureFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock) QEA_IncomeFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
+FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
+FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) QEA_LeisureFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 FnsToEvaluate=FnsToEvaluate2;
 FnsToEvaluate.fractiontimeworked=@(h,aprime,pvprime,a,pv,ks,z1,z2) h; % h is fraction of time worked
@@ -214,7 +214,19 @@ FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1=
 % Three pension regimes: 7%, 15%, 25%
 ACSmat=cell(length(pv_regimes),length(ks_legends),length(pension_schemes),length(shock_titles));
 
-orig_n_a=n_a;
+% --- NEW GRID COMPARISON SETUP ---
+grid_configs = {[139, 5, 79], [67, 5, 37]};
+grid_names = {'Reference Grid (139x5x79)', 'Reduced Grid (67x5x37)'};
+CompareStats = cell(1, 2);
+
+for grid_idx = 1:length(grid_configs)
+    n_a = grid_configs{grid_idx};
+    orig_n_a = n_a; 
+
+    fprintf('\n========================================\n');
+    fprintf('RUNNING CONFIGURATION: %s\n', grid_names{grid_idx});
+    fprintf('========================================\n');
+
 orig_n_z=n_z;
 orig_z2_grid=z2_grid;
 orig_pi_z2=pi_z2;
@@ -261,12 +273,12 @@ for shock_regime=1:length(shock_titles)
                 % Add in 10 years of ks accumulation assuming 4% draw-down
                 ks_balance=[ks_balance, ks_balance(end)+cumsum(ks_balance(end).*((1+Params.ks_r-0.03).^(Params.J-Params.Jr:-1:1)-1))];
                 ks_max=ks_balance(end)*ks_multiplier;
-                ks_max=ks_balance(end)+2;
-                % ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
+                ks_max=20; % ks_balance(end)+2;
+                % ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
                 if mod(ks_regime,2)==1
                     ks_grid=linspace(0,ks_max,n_a(3))';
                 else
-                    ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max),n_a(3)-1))]';
+                    ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max),n_a(3)-1))]';
                 end
             end
             [~,zero_ks_index]=min(abs(ks_grid));
@@ -303,6 +315,8 @@ for shock_regime=1:length(shock_titles)
                     'Assets (a)', ...
                     'Leisure (leisure_h)', ...
                     'Location','northeast'};
+                % Capture the Vectorized stats for this grid size
+                CompareStats{grid_idx} = AgeConditionalStats;
                 % shocks last, so they stay together as a group
                 ACSmat{pv_regime,ks_regime,pension_regime,shock_regime}=AgeConditionalStats;
         
@@ -357,6 +371,37 @@ for shock_regime=1:length(shock_titles)
     end
 end
 
+end % <-- NEW: THIS ENDS THE GRID_IDX LOOP
+
+%% --- DIAGNOSTIC: GRID RESOLUTION COMPARISON ---
+fig_grid_compare = 1000;
+if ishandle(fig_grid_compare); clf(fig_grid_compare); end
+figure(fig_grid_compare);
+
+y_min = 0; % Hard-clamp the debt floor to keep the visual clean
+
+StatsRef = CompareStats{1};
+StatsRed = CompareStats{2};
+
+% Calculate global max for identical Y-axis scaling
+V_total_ref = StatsRef.ks.Mean + StatsRef.pv.Mean*Params.pv_share_price + StatsRef.assets.Mean + StatsRef.leisure_h.Mean;
+V_total_red = StatsRed.ks.Mean + StatsRed.pv.Mean*Params.pv_share_price + StatsRed.assets.Mean + StatsRed.leisure_h.Mean;
+y_max = max(max(V_total_ref), max(V_total_red));
+
+% Plot Reference Grid
+subplot(1,2,1);
+area(1:Params.J, [StatsRef.ks.Mean; StatsRef.pv.Mean*Params.pv_share_price; StatsRef.assets.Mean; StatsRef.leisure_h.Mean]', y_min);
+title(sprintf('%s', grid_names{1}));
+ylim([y_min, y_max]);
+legend(StatsRef.legend{:}, 'Location', 'southoutside');
+
+% Plot Reduced Grid
+subplot(1,2,2);
+area(1:Params.J, [StatsRed.ks.Mean; StatsRed.pv.Mean*Params.pv_share_price; StatsRed.assets.Mean; StatsRed.leisure_h.Mean]', y_min);
+title(sprintf('%s', grid_names{2}));
+ylim([y_min, y_max]);
+legend(StatsRed.legend{:}, 'Location', 'southoutside');
+%% ----------------------------------------------
 
 %% Plot the results
 %% Plot the life cycle profiles of fraction-of-time-worked, earnings, assets, unemployment, and medical expenses
@@ -437,9 +482,9 @@ for ii=1:length(ACSvec)
         clf(fig_start+ii)
     end
     figure(fig_start+ii)
-    area(1:1:Params.J, [ACSvec(ii).ks.Mean; ACSvec(ii).pv.Mean*Params.pv_share_price; ACSvec(ii).assets.Mean; ACSvec(ii).leisure_h.Mean], y_min);
+    area(1:1:Params.J, [(ACSvec(ii).assets.Mean<0).*ACSvec(ii).assets.Mean; ACSvec(ii).ks.Mean; ACSvec(ii).pv.Mean*Params.pv_share_price; (ACSvec(ii).assets.Mean>=0).*ACSvec(ii).assets.Mean; ACSvec(ii).leisure_h.Mean], y_min);
     title(ACSvec(ii).title,'Interpreter','none')
-    legend(ACSvec(ii).legend{:},'Interpreter','none')
+    legend('Debt drawdown limit', ACSvec(ii).legend{:},'Interpreter','none')
     axis([1, length(ACSvec(1).assets.Mean)+1, ACS_min, ACS_mean_max]);
     if any(ACSvec(ii).assets.QuantileMeans(1,:)==asset_grid(1))
         warning(sprintf("assets (Minimum) hit debt floor ACSvec(%d)", ii));
