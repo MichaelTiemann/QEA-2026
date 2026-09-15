@@ -77,27 +77,27 @@ Params.Jr=65-Params.agejshifter;
 % Pensions & Helpers for shock/retirement regimes
 shock_titles={"No Shocks", "Unemployment and Medical", "Energy Only", "All Shocks"};
 % shock_titles={"No Shocks", "Energy Only", "Unemployment and Medical"};
-shock_titles={"Unemployment and Medical"};
+shock_titles={"Energy Only"};
 
 ks_legends={"5% emp only", "3.5% + 3.5%"};
 ks_legends={"5% emp only (linear grid)", "5% emp only (exp grid)"};
-% ks_legends={"3.5% + 3.5%"};
+ks_legends={"5% emp only"};
 
 ks_regime_contributions=[[0.05,0]; [0.035, 0.035]];
 ks_regime_contributions=[[0.05,0]; [0.05,0]];
-% ks_regime_contributions=[[0.035, 0.035]];
+ks_regime_contributions=[[0.05,0]];
 
 ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn,@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn};
-ExocShockFn_vec={@LifeCycleModel21_ExogShockFn};
+ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn};
 
 energy_shock_factor=[0,0,1,1];
-energy_shock_factor=[0];
+energy_shock_factor=[1];
 
 pension_schemes=[0.0, 0.15];
 pension_schemes=0.15;
 
 pv_regimes=1:n_a(2);
-pv_regimes=[1];
+pv_regimes=[n_a(2)];
 
 % Age-dependent labor productivity units
 Params.kappa_j=[linspace(0.5,2,Params.Jr-15),linspace(2,1,14),zeros(1,Params.J-Params.Jr+1)];
@@ -134,11 +134,10 @@ AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mas
 
 %% Grids (except Z, which is case-by-case below)
 vfoptions.precision='double'; simoptions.precision=vfoptions.precision;
-cast2precision=str2func(vfoptions.precision);
 
-zero=cast2precision(0);
-a_grid_debt=1-exp(linspace(log(cast2precision(51)),0,floor(n_a(1)/3)+1));
-a_grid_exp=exp(linspace(cast2precision(-2.5),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast2precision(-2.5)),0,ceil(2*n_a(1)/3));
+zero=cast(0,vfoptions.precision);
+a_grid_debt=1-exp(linspace(log(cast(51,vfoptions.precision)),0,floor(n_a(1)/3)+1));
+a_grid_exp=exp(linspace(cast(-2.5,vfoptions.precision),log(a_multiplier),ceil(2*n_a(1)/3)))-linspace(exp(cast(-2.5,vfoptions.precision)),0,ceil(2*n_a(1)/3));
 asset_grid=[a_grid_debt, a_grid_exp(2:end)]';
 [~,zero_asset_index]=min(abs(asset_grid));
 asset_grid(zero_asset_index)=0;
@@ -271,11 +270,11 @@ for shock_regime=1:length(shock_titles)
                 ks_balance=[ks_balance, ks_balance(end)+cumsum(ks_balance(end).*((1+Params.ks_r-0.03).^(Params.J-Params.Jr:-1:1)-1))];
                 ks_max=ks_balance(end)*ks_multiplier;
                 ks_max=ks_balance(end)+2;
-                % ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
+                % ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
                 if mod(ks_regime,2)==1
                     ks_grid=linspace(0,ks_max,n_a(3))';
                 else
-                    ks_grid=[0, exp(linspace(cast2precision(-4),log(ks_max),n_a(3)-1))]';
+                    ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max),n_a(3)-1))]';
                 end
             end
             [~,zero_ks_index]=min(abs(ks_grid));
@@ -301,7 +300,7 @@ for shock_regime=1:length(shock_titles)
                 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
                 jequaloneDist=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
                 jequaloneDist(zero_asset_index,1,test_ks_index,:,(n_z(2)+1)/2)=statdist_z1; % All agents start with zero assets, no pvs, no kiwisaver, with z drawn from its stationary distribution
-        
+                simoptions_this_shock.z_gridvals_J = z_gridvals_J;
                 StationaryDist=StationaryDist_VFHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
         
                 %% Calculate the life-cycle profiles for all shocks
