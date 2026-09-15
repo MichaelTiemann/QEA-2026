@@ -153,6 +153,7 @@ d_grid=linspace(zero,1,n_d)'; % Notice that it is imposing the 0<=d<=1 condition
 % By saying nothing about vfoptions.l_dexperienceasset or vfoptions.l_d2, it defaults to 1
 % Ditto vfoptions.l_a2
 ksV_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEAV_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ksV_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
@@ -173,8 +174,10 @@ simoptions.whichstats=[1,1,1,0,1,1,0];
 DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
-ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
+VReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
     QEAV_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
+    QEA_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 
 %% Compute Z grids (z_gridvals_J and pi_z_J) manually
@@ -285,16 +288,21 @@ for shock_regime=1:length(shock_titles)
 
                 fprintf("Solving %s, pv_max=%d, ks %s, pension %d%%\n", shock_titles{shock_regime}, pv_regime, ks_legends{ks_regime}, round(100*pension_schemes(pension_regime)));
                 %% Solve the model, with/without shocks, to compare asset profiles
-                [V, Policy]=ValueFnIter_Case1_VFHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_this_shock);
-    
+                vfoptions_this_shock.aprimeFn=ksV_primeFn; simoptions_this_shock.aprimeFn=vfoptions_this_shock.aprimeFn;
+                [VV, VPolicy]=ValueFnIter_Case1_VFHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_J, pi_z_J, VReturnFn, Params, DiscountFactorParamNames, [], vfoptions_this_shock);
+                vfoptions_this_shock.aprimeFn=ks_primeFn; simoptions_this_shock.aprimeFn=vfoptions_this_shock.aprimeFn;
+                [V, Policy]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_gridvals_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions_this_shock);
+
                 %% Initial distribution of agents at birth (j=1)
                 % Before we plot the life-cycle profiles we have to define how agents are at age j=1. We will give them all zero assets.
                 jequaloneDist=zeros([n_a,n_z],vfoptions.precision,'gpuArray'); % Put no households anywhere on grid
                 jequaloneDist(zero_asset_index,1,test_ks_index,:,(n_z(2)+1)/2)=statdist_z1; % All agents start with zero assets, no pvs, no kiwisaver, with z drawn from its stationary distribution
                 simoptions_this_shock.z_gridvals_J = z_gridvals_J;
-                StationaryDist=StationaryDist_VFHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
-        
+                VStationaryDist=StationaryDist_VFHorz_Case1(jequaloneDist,AgeWeightsParamNames,VPolicy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
+                StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy,n_d,n_a,n_z,N_j,pi_z_J,Params,simoptions_this_shock);
+
                 %% Calculate the life-cycle profiles for all shocks
+                VAgeConditionalStats=LifeCycleProfiles_FHorz_Case1(VStationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
                 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_gridvals_J,simoptions_this_shock);
                 AgeConditionalStats.title=sprintf("Life Cycle Profile: Assets Allocations %s; Pension %d", shock_titles{shock_regime}, round(100*pension_schemes(pension_regime)));
                 AgeConditionalStats.legend={sprintf("KiwiSaver Balance (ks) %s", ks_legends{ks_regime}), ...
