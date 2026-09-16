@@ -277,7 +277,17 @@ n_semizze=[N_semiz; N_z; N_e];
 n_semizze=n_semizze(n_semizze~=0);
 
 % --- Memory Constraint Engine ---
-tensor_multiplier = 10; % Est. simultaneous tensors generated in ReturnFn
+% Count the exact number of full-sized tensors ndgrid will generate
+num_d_grids = length(n_d(n_d ~= 0));
+num_a_grids = length(n_a1(n_a1 ~= 0)) + length(n_a2(n_a2 ~= 0));
+num_z_grids = length(n_semiz(n_semiz ~= 0)) + length(n_z(n_z ~= 0)) + length(n_e(n_e ~= 0));
+
+% Core inputs: d + aprime (same size as a) + a + z
+base_tensors = num_d_grids + (2 * num_a_grids) + num_z_grids;
+
+% Add 1 for the ReturnMatrix output
+% Add 3 as a safe buffer for MATLAB's temporary in-place arithmetic arrays
+tensor_multiplier = base_tensors + 4; 
 max_elements = 2^31;
 max_bytes = max_vram_gb * (1024^3);
 
