@@ -168,7 +168,7 @@ vfoptions.aprimeFn=ksV_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
 % simoptions.a_grid is set below
-simoptions.optimize_nProbs=0;
+simoptions.optimize_nProbs=1;
 simoptions.verbose=1;
 
 % 1st element: mean
@@ -221,7 +221,7 @@ FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % in
 FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
 
 %% --- NEW GRID COMPARISON SETUP ---
-grid_configs = {[151, 5, 83], [37, 5, 13]};
+grid_configs = {[51, 5, 23], [37, 5, 13]};
 grid_labels  = {'Reference Grid', 'Reduced Grid'};
 
 % Automatically generate printable names from the dimensions
