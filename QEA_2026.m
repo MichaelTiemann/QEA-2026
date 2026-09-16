@@ -53,7 +53,7 @@ Params.Q_max=20;
 % Discount rate
 Params.beta = 0.96;
 % Preferences
-Params.sigma = 2.5; % Coeff of relative risk aversion (curvature of consumption); larger=>more precautionary
+Params.sigma = 2.2; % Coeff of relative risk aversion (curvature of consumption); larger=>more precautionary
 Params.eta = 0.5; % Curvature of leisure (This will end up being 1/Frisch elasticity); larger=>less leisure
 Params.psi = 10; % Weight on leisure; larger=>more leisure
 
@@ -119,7 +119,7 @@ Params.sj=1-Params.dj((1:N_j)+Params.agejshifter); % Conditional survival probab
 Params.sj(end)=0; % In the present model the last period (j=J) value of sj is actually irrelevant
 
 % Warm glow of bequest
-Params.wg1=0.3; % (relative) importance of bequests
+Params.wg1=1.5; % (relative) importance of bequests
 Params.wg2=3; % degree to which bequests are a luxury good (>=1; =1 would be a normal good)
 Params.wg3=Params.sigma; % By using the same curvature as the utility of consumption it makes it much easier to guess appropriate parameter values for the warm glow
 
@@ -176,7 +176,7 @@ ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_e
 % Discretize the AR(1) process z2
 % Exogenous shock process, z2: AR1 on labor productivity units
 % Note this is not dependent on age
-Params.rho_z2=0.25; % 0.25 creates more tail-risk in pi_z vs 0.5
+Params.rho_z2=0.75; % 0.25 creates more tail-risk in pi_z vs 0.5
 Params.sigma_epsilon_z2=0.25; % 0.5 creates more extreme values in z_grid vs 0.25
 [z2_grid,pi_z2]=discretizeAR1_FarmerToda(0,Params.rho_z2,Params.sigma_epsilon_z2,n_z(2));
 z2_grid=exp(z2_grid); % Take exponential of the grid
@@ -202,8 +202,15 @@ FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % in
 FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
 
 %% --- NEW GRID COMPARISON SETUP ---
-grid_configs = {[139, 5, 79], [67, 5, 37]};
-grid_names = {'Reference Grid (139x5x79)', 'Reduced Grid (67x5x37)'};
+grid_configs = {[97, 5, 41], [97, 5, 17]};
+grid_labels  = {'Reference Grid', 'Reduced Grid'};
+
+% Automatically generate printable names from the dimensions
+grid_names = cell(size(grid_configs));
+for ii = 1:length(grid_configs)
+    dims = grid_configs{ii};
+    grid_names{ii} = sprintf('%s [%d %d %d]', grid_labels{ii}, dims(1), dims(2), dims(3));
+end
 CompareStats = cell(1, length(grid_configs));
 
 for grid_idx = 1:length(grid_configs)
@@ -265,16 +272,23 @@ for grid_idx = 1:length(grid_configs)
                     % employer match, agents can invest 10% of w per year before they retire.
                     % 0.1*cumsum(1.07.^(45:-1:1)) is 30*w if no shocks (and no kappa_j).
                     % Grid is bounded by 0 and exp(-4)==0.0183 is entry-point for low-earners
+                    % In the face of unemployment shocks, the unemployed don't contribute, reducing the average
                     ks_contrib_sum=Params.w*sum(Params.ks_employee*Params.kappa_j(1:Params.Jr-1));
                     if Params.ks_r==0
                         ks_balance=Params.w*cumsum((Params.ks_employee+Params.ks_employer)*Params.kappa_j(1:Params.Jr-1));
                     else
                         ks_balance=Params.w*cumsum((Params.ks_employee+Params.ks_employer)*Params.kappa_j(1:Params.Jr-1).*((1+Params.ks_r).^(Params.Jr-1:-1:1)-1));
                     end
-                    % Add in 10 years of ks accumulation assuming 4% draw-down
-                    ks_balance=[ks_balance, ks_balance(end)+cumsum(ks_balance(end).*((1+Params.ks_r-0.03).^(Params.J-Params.Jr:-1:1)-1))];
-                    ks_max=ks_balance(end)*ks_multiplier;
-                    ks_max=20; % ks_balance(end)+2;
+                    % Add in at most 10 years of ks accumulation assuming 5% draw-down
+                    % Vector of net growth factors for each year of retirement (interest minus 5% withdrawal)
+                    retirement_factors = (1 + Params.ks_r - 0.05) * ones(1, min(10, Params.J - Params.Jr));
+                    % Compute sequential compounding and scale by the final working-age balance
+                    retirement_balance = ks_balance(end) * cumprod(retirement_factors);
+                    % Concatenate the working-age and retirement balances
+                    ks_balance_full = [ks_balance, retirement_balance];
+                    expected_labor_fraction = 0.45;
+                    ks_max = max(ks_balance_full) * expected_labor_fraction;
+
                     % ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
                     if mod(ks_regime,2)==1
                         ks_grid=linspace(0,ks_max,n_a(3))';
@@ -393,7 +407,7 @@ StatsRed = CompareStats{2};
 % Calculate global max for identical Y-axis scaling (only count positive assets)
 V_total_ref = StatsRef.ks.Mean + StatsRef.pv.Mean*Params.pv_share_price + max(0, StatsRef.assets.Mean) + StatsRef.leisure_h.Mean;
 V_total_red = StatsRed.ks.Mean + StatsRed.pv.Mean*Params.pv_share_price + max(0, StatsRed.assets.Mean) + StatsRed.leisure_h.Mean;
-y_max = max(max(V_total_ref), max(V_total_red));
+y_max = max(max(V_total_ref), max(V_total_red)) + 1; % Create a little headroom at the top of the graph area
 
 % Plot Reference Grid
 subplot(1,2,1);
