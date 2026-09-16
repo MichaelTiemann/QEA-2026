@@ -17,6 +17,7 @@ if exist('vfoptions','var')==0
     vfoptions.experienceassete=0;
     vfoptions.experienceassetz=0;
     vfoptions.experienceassetze=0;
+    simoptions.experienceassetsemiz=0;
     vfoptions.riskyasset=0;
     vfoptions.residualasset=0;
     vfoptions.n_ambiguity=0;
@@ -40,6 +41,9 @@ else
     end
     if ~isfield(vfoptions,'experienceassetze')
         vfoptions.experienceassetze=0;
+    end
+    if ~isfield(vfoptions,'experienceassetsemiz')
+        vfoptions.experienceassetsemiz=0;
     end
     if ~isfield(vfoptions,'riskyasset')
         vfoptions.riskyasset=0;
@@ -85,12 +89,17 @@ if vfoptions.experienceasset>=1 || vfoptions.experienceassetu>=1 || vfoptions.ex
         if ~isfield(vfoptions,'l_dexperienceassetz')
             vfoptions.l_dexperienceassetz=1; % by default, only one decision variable influences the experienceassetz
         end
+    elseif simoptions.experienceassetsemiz>=1
+        % semiz is always present (it drives the experience asset)
+        if ~isfield(simoptions,'l_dexperienceassetsemiz')
+            simoptions.l_dexperienceassetsemiz=1; % by default, only one decision variable influences the experienceassetsemiz
+        end
     elseif vfoptions.experienceassetze>=1
         if ~isfield(vfoptions,'l_dexperienceassetze')
             vfoptions.l_dexperienceassetze=1; % by default, only one decision variable influences the experienceassetze
         end
     end
-    
+
     if vfoptions.experienceasset>=1
         vfoptions.l_d2=vfoptions.l_dexperienceasset;
         vfoptions.l_a2=vfoptions.experienceasset;
@@ -103,6 +112,9 @@ if vfoptions.experienceasset>=1 || vfoptions.experienceassetu>=1 || vfoptions.ex
     elseif vfoptions.experienceassetz>=1
         vfoptions.l_d2=vfoptions.l_dexperienceassetz;
         vfoptions.l_a2=vfoptions.experienceassetz;
+    elseif vfoptions.experienceassetsemiz>=1
+        vfoptions.l_d2=vfoptions.l_dexperienceassetsemiz;
+        vfoptions.l_a2=vfoptions.experienceassetsemiz;
     elseif vfoptions.experienceassetze>=1
         vfoptions.l_d2=vfoptions.l_dexperienceassetze;
         vfoptions.l_a2=vfoptions.experienceassetze;
@@ -163,7 +175,7 @@ if vfoptions.experienceasset>=1 || vfoptions.experienceassetu>=1 || vfoptions.ex
     if isnan(lowmem_aprimefn)
         assert(false);
     else
-        lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d2],n_a1,n_a2,vfoptions.n_semiz,n_z,vfoptions.n_e);
+        lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d2],n_a1,n_a2,vfoptions.n_semiz,n_z,vfoptions.n_e,vfoptions);
     end
     lowmem=max(lowmem_aprimefn,lowmem_returnfn);
 elseif vfoptions.riskyasset>=1
@@ -187,7 +199,7 @@ elseif vfoptions.riskyasset>=1
     if any(vfoptions.refine_d(2:3)==0)
         error('vfoptions.refine_d cannot contain zeros for d2 or d3 (you can do no d1, but you cannot do no d2 nor no d3)')
     end
-    
+
     if vfoptions.refine_d(1)>0
         n_d1=n_d(1:vfoptions.refine_d(1));
     else
@@ -209,7 +221,7 @@ elseif vfoptions.riskyasset>=1
         n_d4=0;
     end
     lowmem_aprimefn=calculate_lowmem_aprime_raw([n_d2,n_d3,n_a1],n_a2,vfoptions.n_u);
-    lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d3,n_d4],n_a1,n_a2,n_z,vfoptions.n_semiz,vfoptions.n_e);
+    lowmem_returnfn=calculate_lowmem_raw([n_d1,n_d3,n_d4],n_a1,n_a2,n_z,vfoptions.n_semiz,vfoptions.n_e,vfoptions);
     lowmem=max(lowmem_aprimefn,lowmem_returnfn);
 elseif vfoptions.residualasset
     if isscalar(n_a)
@@ -219,10 +231,10 @@ elseif vfoptions.residualasset
     end
     n_r=n_a(end); % n_a2 is the residual asset
     rprimefn_lowmem=calculate_lowmem_aprimefn_raw([n_d,n_a1],n_r,[],n_z,vfoptions.n_e);
-    lowmem_returnfn=calculate_lowmem_raw(n_d,n_a1,n_r,[],[n_z,vfoptions.n_e]);
+    lowmem_returnfn=calculate_lowmem_raw(n_d,n_a1,n_r,[],[n_z,vfoptions.n_e],vfoptions);
     lowmem=max(rprimefn_lowmem,lowmem_returnfn);
 elseif isfield(vfoptions,'StateDependentVariables_z')==1 || vfoptions.dynasty==1
-    lowmem=calculate_lowmem_raw(n_d,n_a,[],[],n_z,[]);
+    lowmem=calculate_lowmem_raw(n_d,n_a,[],[],n_z,[],vfoptions);
 elseif prod(vfoptions.n_semiz)>0
     if length(n_d)>vfoptions.l_dsemiz
         n_d1=n_d(1:end-vfoptions.l_dsemiz);
@@ -231,9 +243,9 @@ elseif prod(vfoptions.n_semiz)>0
     end
     n_d2=n_d(end-vfoptions.l_dsemiz+1:end); % n_d2 is the decision variable that influences the transition probabilities of the semi-exogenous state
 
-    lowmem=calculate_lowmem_raw(n_d, n_a, [], vfoptions.n_semiz,n_z,vfoptions.n_e);
+    lowmem=calculate_lowmem_raw(n_d, n_a, [], vfoptions.n_semiz,n_z,vfoptions.n_e,vfoptions);
 else
-    lowmem=calculate_lowmem_raw(n_d, n_a, [], [], n_z, vfoptions.n_e);
+    lowmem=calculate_lowmem_raw(n_d, n_a, [], [], n_z, vfoptions.n_e,vfoptions);
 end
 
 
@@ -242,54 +254,74 @@ end
 
 
 
-%% Calculate lowmem values for simple grids
-function lowmem = calculate_lowmem_raw(n_d, n_a1, n_a2, n_semiz, n_z, n_e)
+%% Calculate lowmem values for simple grids (Merged with VRAM Limits)
+function lowmem = calculate_lowmem_raw(n_d, n_a1, n_a2, n_semiz, n_z, n_e, vfoptions)
 
-if n_d==0
-    n_d=1;
-end
+bytes_per_element=sizeof(vfoptions.precision);
+max_vram_gb = gpu_ram();
+
+if n_d==0; n_d=1; end
 N_d=prod(n_d(n_d~=0));
-if n_a1==0
-    n_a1=1;
-end
+
+if n_a1==0; n_a1=1; end
 N_a1=prod(n_a1(n_a1~=0));
-if n_a2==0
-    n_a2=1;
-end
+
+if n_a2==0; n_a2=1; end
 N_a2=prod(n_a2(n_a2~=0));
+
 N_semiz=prod(~isempty(n_semiz)*n_semiz);
 N_z=prod(~isempty(n_z)*n_z);
 N_e=prod(~isempty(n_e)*n_e);
+
 n_semizze=[N_semiz; N_z; N_e];
 n_semizze=n_semizze(n_semizze~=0);
 
+% --- Memory Constraint Engine ---
+% Count the exact number of full-sized tensors ndgrid will generate
+num_d_grids = length(n_d(n_d ~= 0));
+num_a_grids = length(n_a1(n_a1 ~= 0)) + length(n_a2(n_a2 ~= 0));
+num_z_grids = length(n_semiz(n_semiz ~= 0)) + length(n_z(n_z ~= 0)) + length(n_e(n_e ~= 0));
+
+% Core inputs: d + aprime (same size as a) + a + z
+base_tensors = num_d_grids + (2 * num_a_grids) + num_z_grids;
+
+% Add 1 for the ReturnMatrix output
+% Add 3 as a safe buffer for MATLAB's temporary in-place arithmetic arrays
+tensor_multiplier = base_tensors + 4; 
+max_elements = 2^31;
+max_bytes = max_vram_gb * (1024^3);
+
+% Anonymous function to check both Index limits AND physical VRAM limits
+is_safe = @(numel) (numel < max_elements) && ((numel * bytes_per_element * tensor_multiplier) < max_bytes);
+% --------------------------------
+
 numel_lowmem5=N_d*N_a1*N_a1;
-if numel_lowmem5 < 2^31
+
+if is_safe(numel_lowmem5)
     numel_lowmem4=numel_lowmem5*N_a2;
-    if numel_lowmem4 < 2^31
+    if is_safe(numel_lowmem4)
         numel_lowmem3=numel_lowmem4*prod(n_semizze);
-        if numel_lowmem3 < 2^31
-            lowmem=0; % we can vectorize everything
-        else
+        if is_safe(numel_lowmem3)
+            lowmem=0; % we can vectorize everything else
             switch length(n_semizze)
                 case 1
                     lowmem=1;
                 case 2
                     if N_e
-                        if numel_lowmem4*max(N_semiz,N_z) < 2^31
+                        if is_safe(numel_lowmem4*max(N_semiz,N_z))
                             lowmem=1;
                         else
                             lowmem=2;
                         end
-                    elseif numel_lowmem4*N_semiz < 2^31
+                    elseif is_safe(numel_lowmem4*N_semiz)
                         lowmem=1;
                     else
                         lowmem=2;
                     end
                 case 3
-                    if numel_lowmem4*N_semiz*N_z < 2^31
+                    if is_safe(numel_lowmem4*N_semiz*N_z)
                         lowmem=1;
-                    elseif numel_lowmem4*N_semiz < 2^31
+                    elseif is_safe(numel_lowmem4*N_semiz)
                         lowmem=2;
                     else
                         lowmem=3;
@@ -297,20 +329,21 @@ if numel_lowmem5 < 2^31
                 otherwise
                     assert(false);
             end
+        else
+            lowmem=4;
         end
-    elseif numel_lowmem5*prod(n_semizze) < 2^31
+    elseif is_safe(numel_lowmem5*prod(n_semizze))
         lowmem=4;
     else
         lowmem=5;
     end
-    fprintf("lowmem = %d \n", lowmem)
+    fprintf("lowmem = %d \n", lowmem);
 else
-    error("Model size exceeds GPU maximum variable size");
+    error("Model size exceeds both GPU VRAM and Index maximum variable size");
 end
 
+
 end
-
-
 
 
 %% Calculate lowmem values for simple grids
@@ -392,4 +425,15 @@ function lowmem = calculate_lowmem_PType(n_d, n_a, n_z, vfoptions)
         error("lowmem PType requires struct arguments");
     end
 
+end
+
+
+function n = sizeof(type)
+dummy = zeros(1,type);
+n = length(typecast(dummy,'int8'));
+end
+
+function gb = gpu_ram()
+g = gpuDevice();
+gb = g.TotalMemory / 1e9;     % Total GPU RAM in gigabytes
 end
