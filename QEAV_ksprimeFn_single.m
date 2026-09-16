@@ -1,4 +1,4 @@
-function ks_prime = QEAV_ksprimeFn_double(d, ks, z1, z2, w, agej, Jr, ks_r, ks_employee, ks_employer, kappa_j)
+function ks_prime = QEAV_ksprimeFn_single(d, ks, z1, z2, w, agej, Jr, ks_r, ks_employee, ks_employer, kappa_j)
 % Vectorized KiwiSaver Experience Asset Transition Function
 
 % 'd' acts as hours 'h' before retirement, and withdrawal rate 'ks_out' after.
