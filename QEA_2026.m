@@ -202,7 +202,7 @@ FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % in
 FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
 
 %% --- NEW GRID COMPARISON SETUP ---
-grid_configs = {[97, 5, 41], [97, 5, 17]};
+grid_configs = {[37, 2, 17], [17, 2, 13]};
 grid_labels  = {'Reference Grid', 'Reduced Grid'};
 
 % Automatically generate printable names from the dimensions
