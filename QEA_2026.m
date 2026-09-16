@@ -287,7 +287,7 @@ for grid_idx = 1:length(grid_configs)
                     % Concatenate the working-age and retirement balances
                     ks_balance_full = [ks_balance, retirement_balance];
                     % Must be large enough to capture hardest-working agent
-                    ks_max = max(ks_balance_full);
+                    ks_max = max(ks_balance_full) * 0.67;
 
                     % ks_grid=[0, exp(linspace(cast(-4,vfoptions.precision),log(ks_max-ks_contrib_sum+1),n_a(3)-1))+linspace(0,ks_contrib_sum,n_a(3)-1)]';
                     if mod(ks_regime,2)==1
