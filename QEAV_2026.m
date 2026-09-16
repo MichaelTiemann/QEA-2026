@@ -150,7 +150,7 @@ Params.mewj=Params.mewj./sum(Params.mewj); % Normalize to one
 AgeWeightsParamNames={'mewj'}; % So VFI Toolkit knows which parameter is the mass of agents of each age
 
 %% Grids (except Z, which is case-by-case below)
-vfoptions.precision='double'; simoptions.precision=vfoptions.precision;
+vfoptions.precision='single'; simoptions.precision=vfoptions.precision;
 
 zero=cast(0,vfoptions.precision);
 
@@ -162,8 +162,8 @@ d_grid=linspace(zero,1,n_d)'; % Notice that it is imposing the 0<=d<=1 condition
 %% Define aprime function for KiwiSaver
 % By saying nothing about vfoptions.l_dexperienceasset or vfoptions.l_d2, it defaults to 1
 % Ditto vfoptions.l_a2
-ksV_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEAV_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
-ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn_double(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ksV_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEAV_ksprimeFn_single(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
+ks_primeFn=@(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j) QEA_ksprimeFn_single(d,ks,z1,z2,w,agej,Jr,ks_r,ks_employee,ks_employer,kappa_j); % Will return the value of ks_prime
 vfoptions.aprimeFn=ksV_primeFn; simoptions.aprimeFn=vfoptions.aprimeFn;
 vfoptions.experienceassetz=1; simoptions.experienceassetz=1;
 simoptions.d_grid=d_grid;
@@ -185,9 +185,9 @@ DiscountFactorParamNames={'beta','sj'};
 
 % Now use 'QEA_ReturnFn'
 VReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
-    QEAV_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+    QEAV_ReturnFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 ReturnFn=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) ...
-    QEA_ReturnFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+    QEA_ReturnFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,sigma,psi,eta,agej,Jr,pension,r,ks_employee,kappa_j,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 
 %% Compute Z grids (z_gridvals_J and pi_z_J) manually
@@ -207,9 +207,9 @@ z2_grid=z2_grid./mean_z2; % Normalise the grid on z2 (so that the mean of z2 is 
 % FnsToEvaluate are how we say what we want to graph the life-cycles of
 % Like with return function, we have to include (generically, d,aprime,a,z) as first inputs, then just any relevant parameters.
 
-FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock) QEA_IncomeFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
-FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
-FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) QEA_LeisureFn_double(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
+FnsToEvaluate2.income=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock) QEA_IncomeFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,energy_shock);
+FnsToEvaluate2.expenses=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price) QEA_ExpensesFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,r,kappa_j,energy_shock,pv_share_price);
+FnsToEvaluate2.leisure_h=@(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price) QEA_LeisureFn_single(d,aprime,pvprime,a,pv,ks,z1,z2,w,agej,Jr,pension,r,kappa_j,ks_employee,wg1,wg2,wg3,beta,sj,energy_shock,pv_share_price);
 
 FnsToEvaluate=FnsToEvaluate2;
 FnsToEvaluate.fractiontimeworked=@(h,aprime,pvprime,a,pv,ks,z1,z2) h; % h is fraction of time worked
@@ -221,7 +221,7 @@ FnsToEvaluate.fractionunemployed=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0); % in
 FnsToEvaluate.fractionwithmedicalexpenses=@(d,aprime,pvprime,a,pv,ks,z1,z2) (z1==0.300000011920928955078125); % indicator for z=0.3 medical shock
 
 %% --- NEW GRID COMPARISON SETUP ---
-grid_configs = {[37, 2, 17], [17, 2, 13]};
+grid_configs = {[151, 5, 83], [37, 5, 13]};
 grid_labels  = {'Reference Grid', 'Reduced Grid'};
 
 % Automatically generate printable names from the dimensions
