@@ -403,9 +403,7 @@ end % --- END OF GRID_IDX LOOP ---
 fig_grid_compare = 1000;
 if ishandle(fig_grid_compare); clf(fig_grid_compare); end
 figure(fig_grid_compare);
-
 y_min = -2; % Show shallow average debt, hide the -50 abyss
-
 StatsRef = CompareStats{1};
 StatsRed = CompareStats{2};
 
@@ -413,12 +411,12 @@ StatsRed = CompareStats{2};
 V_total_ref = StatsRef.ks.Mean + StatsRef.pv.Mean*Params.pv_share_price + max(0, StatsRef.assets.Mean) + StatsRef.leisure_h.Mean;
 V_total_red = StatsRed.ks.Mean + StatsRed.pv.Mean*Params.pv_share_price + max(0, StatsRed.assets.Mean) + StatsRed.leisure_h.Mean;
 
-% Wrap y_max in gather() so ylim() doesn't crash
+% 1. GATHER Y_MAX
 y_max = gather(max(max(V_total_ref), max(V_total_red))) + 1; 
 
 % Plot Reference Grid
 subplot(1,2,1);
-% Wrap the area inputs in gather()!
+% 2. GATHER THE AREA MATRIX
 area(1:Params.J, gather([(StatsRef.assets.Mean<0).*StatsRef.assets.Mean; StatsRef.ks.Mean; StatsRef.pv.Mean*Params.pv_share_price; (StatsRef.assets.Mean>=0).*StatsRef.assets.Mean; StatsRef.leisure_h.Mean])', y_min);
 title(sprintf('%s', grid_names{1}), 'Interpreter', 'none');
 ylim([y_min, y_max]);
@@ -426,7 +424,7 @@ legend('Average Debt', StatsRef.legend{1:4}, 'Location', 'southoutside');
 
 % Plot Reduced Grid
 subplot(1,2,2);
-% Wrap the area inputs in gather()!
+% 3. GATHER THE AREA MATRIX
 area(1:Params.J, gather([(StatsRed.assets.Mean<0).*StatsRed.assets.Mean; StatsRed.ks.Mean; StatsRed.pv.Mean*Params.pv_share_price; (StatsRed.assets.Mean>=0).*StatsRed.assets.Mean; StatsRed.leisure_h.Mean])', y_min);
 title(sprintf('%s', grid_names{2}), 'Interpreter', 'none');
 ylim([y_min, y_max]);
