@@ -77,18 +77,18 @@ Params.Jr=65-Params.agejshifter;
 % Pensions & Helpers for shock/retirement regimes
 shock_titles={"No Shocks", "Unemployment and Medical", "Energy Only", "All Shocks"};
 % shock_titles={"No Shocks", "Energy Only", "Unemployment and Medical"};
-shock_titles={"Energy Only"};
+shock_titles={"All Shocks"};
 
 ks_legends={"5% emp only", "3.5% + 3.5%"};
 ks_legends={"5% emp only (linear grid)", "5% emp only (exp grid)"};
-ks_legends={"5% emp only"};
+ks_legends={"5% emp only (linear grid)"};
 
 ks_regime_contributions=[[0.05,0]; [0.035, 0.035]];
 ks_regime_contributions=[[0.05,0]; [0.05,0]];
-ks_regime_contributions=[[0.05,0]];
+ks_regime_contributions=[[0.05, 0.00]];
 
 ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn,@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn};
-ExocShockFn_vec={@LifeCycleModel21_ExogShockFn3,@LifeCycleModel21_ExogShockFn};
+ExocShockFn_vec={@LifeCycleModel21_ExogShockFn};
 
 energy_shock_factor=[0,0,1,1];
 energy_shock_factor=[1];
@@ -214,6 +214,8 @@ for ii = 1:length(grid_configs)
     grid_names{ii} = sprintf('%s [%d %d %d]', grid_labels{ii}, dims(1), dims(2), dims(3));
 end
 CompareStats = cell(1, length(grid_configs));
+% Initialize with a 5th dimension for grid_idx!
+ACSmat = cell(length(pv_regimes), length(ks_legends), length(pension_schemes), length(shock_titles), length(grid_configs));
 
 for grid_idx = 1:length(grid_configs)
     n_a = grid_configs{grid_idx};
@@ -232,9 +234,6 @@ for grid_idx = 1:length(grid_configs)
 
     % 2. Dynamically build pv_grid based on the current n_a(2)
     pv_grid=(2.^(0:n_a(2)-1)-1)';
-
-    % 3. Initialize tracking matrices for this grid
-    ACSmat=cell(length(pv_regimes),length(ks_legends),length(pension_schemes),length(shock_titles));
     orig_n_a=n_a;
     orig_n_z=n_z;
     orig_z2_grid=z2_grid;
@@ -340,7 +339,8 @@ for grid_idx = 1:length(grid_configs)
                     % Capture the Vectorized stats for this grid size
                     CompareStats{grid_idx} = VAgeConditionalStats;
                     % shocks last, so they stay together as a group
-                    ACSmat{pv_regime,ks_regime,pension_regime,shock_regime}=VAgeConditionalStats;
+                    % Add grid_idx to the indexing
+                    ACSmat{pv_regime,ks_regime,pension_regime,shock_regime,grid_idx}=VAgeConditionalStats;
 
                     % Notice that medical expense shocks late in life cause elderly households
                     % to hold more assets (as self-insurance against medical expense shocks)
@@ -412,18 +412,22 @@ StatsRed = CompareStats{2};
 % Calculate global max for identical Y-axis scaling (only count positive assets)
 V_total_ref = StatsRef.ks.Mean + StatsRef.pv.Mean*Params.pv_share_price + max(0, StatsRef.assets.Mean) + StatsRef.leisure_h.Mean;
 V_total_red = StatsRed.ks.Mean + StatsRed.pv.Mean*Params.pv_share_price + max(0, StatsRed.assets.Mean) + StatsRed.leisure_h.Mean;
-y_max = max(max(V_total_ref), max(V_total_red)) + 1; % Create a little headroom at the top of the graph area
+
+% Wrap y_max in gather() so ylim() doesn't crash
+y_max = gather(max(max(V_total_ref), max(V_total_red))) + 1; 
 
 % Plot Reference Grid
 subplot(1,2,1);
-area(1:Params.J, [(StatsRef.assets.Mean<0).*StatsRef.assets.Mean; StatsRef.ks.Mean; StatsRef.pv.Mean*Params.pv_share_price; (StatsRef.assets.Mean>=0).*StatsRef.assets.Mean; StatsRef.leisure_h.Mean]', y_min);
+% Wrap the area inputs in gather()!
+area(1:Params.J, gather([(StatsRef.assets.Mean<0).*StatsRef.assets.Mean; StatsRef.ks.Mean; StatsRef.pv.Mean*Params.pv_share_price; (StatsRef.assets.Mean>=0).*StatsRef.assets.Mean; StatsRef.leisure_h.Mean])', y_min);
 title(sprintf('%s', grid_names{1}), 'Interpreter', 'none');
 ylim([y_min, y_max]);
 legend('Average Debt', StatsRef.legend{1:4}, 'Location', 'southoutside');
 
 % Plot Reduced Grid
 subplot(1,2,2);
-area(1:Params.J, [(StatsRed.assets.Mean<0).*StatsRed.assets.Mean; StatsRed.ks.Mean; StatsRed.pv.Mean*Params.pv_share_price; (StatsRed.assets.Mean>=0).*StatsRed.assets.Mean; StatsRed.leisure_h.Mean]', y_min);
+% Wrap the area inputs in gather()!
+area(1:Params.J, gather([(StatsRed.assets.Mean<0).*StatsRed.assets.Mean; StatsRed.ks.Mean; StatsRed.pv.Mean*Params.pv_share_price; (StatsRed.assets.Mean>=0).*StatsRed.assets.Mean; StatsRed.leisure_h.Mean])', y_min);
 title(sprintf('%s', grid_names{2}), 'Interpreter', 'none');
 ylim([y_min, y_max]);
 legend('Average Debt', StatsRed.legend{1:4}, 'Location', 'southoutside');
