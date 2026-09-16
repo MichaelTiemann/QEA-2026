@@ -51,10 +51,27 @@ Params.Q_max=20;
 
 % Discount rate
 Params.beta = 0.96;
-% Preferences
-Params.sigma = 2.2; % Coeff of relative risk aversion (curvature of consumption); larger=>more precautionary
-Params.eta = 0.5; % Curvature of leisure (This will end up being 1/Frisch elasticity); larger=>less leisure
-Params.psi = 10; % Weight on leisure; larger=>more leisure
+Params.beta0 = 0.80; % <-- NEW: Quasi-Hyperbolic present-bias parameter
+
+% Preferences (Core)
+Params.sigma = 2.0; 
+Params.eta   = 0.5;  
+Params.psi   = 10;   
+
+% Preferences (Epstein-Zin)
+Params.ez_risk_aversion = 4.0; % High Risk Aversion 
+Params.ez_eis           = 0.5; % Elasticity of Intertemporal Substitution
+
+%% Exotic Preferences: Quasi-Hyperbolic Epstein-Zin (QH-EZ)
+vfoptions.exoticpreferences    = 'QHEpsteinZin';
+vfoptions.quasi_hyperbolic     = 'Sophisticated'; 
+vfoptions.QHadditionaldiscount = 'beta0';         
+
+% Epstein-Zin Aggregation Settings
+vfoptions.EZriskaversion    = 'ez_risk_aversion'; % <-- Pass the string name!
+vfoptions.EZeis             = 'ez_eis';           % <-- Pass the string name!
+vfoptions.EZpositiveutility = 0;   
+vfoptions.EZutils           = 1;
 
 % Prices
 Params.w=1; % Wage
